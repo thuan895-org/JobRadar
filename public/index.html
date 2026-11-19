@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JobRadar</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2330; --muted: #677085; --line: #e3e6ec;
+    --accent: #2f6fed; --accent-soft: #e8efff; --good: #1a8a52; --good-soft: #e3f5ea;
+    --warn: #b26b00; --warn-soft: #fff3df; --chip: #eef0f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1a1e26; --text: #e6e9ef; --muted: #98a1b3; --line: #2a303b;
+      --accent: #6d9bff; --accent-soft: #1e2a44; --good: #4cc98a; --good-soft: #17301f;
+      --warn: #f0a640; --warn-soft: #33270f; --chip: #252b35;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 14px 0 10px; flex-wrap: wrap; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  .status-line { color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; padding: 6px 12px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .tabs { display: flex; gap: 4px; overflow-x: auto; }
+  .tab { border: none; background: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 10px; color: var(--muted); white-space: nowrap; }
+  .tab.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 12px 0; }
+  .filters input[type=search], .filters select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  .filters input[type=search] { flex: 1; min-width: 180px; }
+  .filters label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+  main { padding: 16px 0 40px; }
+  .job { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  .job.restricted { opacity: .62; }
+  .row { display: flex; gap: 12px; align-items: flex-start; }
+  .score { min-width: 44px; text-align: center; font-weight: 700; border-radius: 8px; padding: 4px 0; background: var(--chip); color: var(--muted); }
+  .score.hi { background: var(--good-soft); color: var(--good); }
+  .score.mid { background: var(--accent-soft); color: var(--accent); }
+  .body { flex: 1; min-width: 0; }
+  .title { font-weight: 600; font-size: 16px; color: var(--text); text-decoration: none; }
+  .title:hover { color: var(--accent); }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .meta .money { color: var(--good); font-weight: 600; }
+  .meta .warn { color: var(--warn); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .desc { color: var(--muted); font-size: 14px; margin-top: 8px; white-space: pre-line; overflow-wrap: anywhere; }
+  .desc.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .actions button { font-size: 13px; padding: 4px 10px; }
+  .empty { text-align: center; color: var(--muted); padding: 60px 0; }
+  footer { color: var(--muted); font-size: 12px; padding: 20px 0 40px; border-top: 1px solid var(--line); }
+  footer a { color: var(--muted); }
+  .src-ok { color: var(--good); } .src-err { color: var(--warn); }
+  .score small { display: block; font-size: 10px; font-weight: 500; opacity: .8; }
+  .ai-reason { margin-top: 8px; font-size: 14px; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--text); }
+  .setup { margin: 16px 0 0; padding: 12px 16px; border-radius: 10px; background: var(--warn-soft); border: 1px solid var(--warn); font-size: 14px; }
+  .setup b { color: var(--warn); }
+  .setup ol { margin: 6px 0 0; padding-left: 20px; }
+  .setup code { background: var(--card); padding: 1px 5px; border-radius: 4px; }
+  .hl { margin-top: 10px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 0 8px 8px 0; padding: 8px 12px; }
+  .hl-title { font-size: 12px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .hl ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 18px; }
+  .hl li { font-size: 14px; line-height: 1.4; }
+  .hl.wait { color: var(--muted); font-size: 13px; border-left-color: var(--line); }
+  .hl.wait.busy::after { content: ''; display: inline-block; width: 10px; height: 10px; margin-left: 8px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; }
+  .hl button { font-size: 12px; padding: 2px 8px; margin-left: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 700px) { .hl ul { grid-template-columns: 1fr; } }
+  .ai-flags { margin-top: 6px; font-size: 13px; color: var(--warn); }
+  .chip.scam { background: var(--warn-soft); color: var(--warn); }
+  button.ai { border-color: var(--accent); color: var(--accent); }
+  dialog { width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--line); border-radius: 14px; padding: 0; background: var(--card); color: var(--text); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg-head { position: sticky; top: 0; background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 18px; display: flex; gap: 10px; align-items: flex-start; }
+  .dlg-head h2 { font-size: 17px; margin: 0; flex: 1; }
+  .dlg-body { padding: 6px 18px 20px; }
+  .kit-sec { margin-top: 16px; }
+  .kit-sec h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .kit-sec h3 button { font-size: 12px; padding: 2px 8px; text-transform: none; letter-spacing: 0; }
+  .kit-text { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; overflow-wrap: anywhere; }
+  .kit-sec ul { margin: 0; padding-left: 20px; font-size: 14px; }
+  .kit-sec li { margin: 3px 0; }
+  .missing { background: var(--warn-soft); border-radius: 8px; padding: 8px 12px; }
+  .missing h3 { color: var(--warn); }
+  .qa { margin-bottom: 8px; }
+  .qa b { display: block; font-size: 14px; }
+  .loading { padding: 50px 0; text-align: center; color: var(--muted); }
+  @media (max-width: 560px) { .score { min-width: 38px; } .title { font-size: 15px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <h1>📡 JobRadar</h1>
+      <div class="status-line" id="statusLine">Đang tải…</div>
+      <button class="primary" id="refresh">Quét ngay</button>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="filters">
+      <input type="search" id="q" placeholder="Tìm theo từ khoá, ví dụ: flutter, mcp, vietnamese">
+      <select id="source"><option value="">Tất cả nguồn</option></select>
+      <label>Điểm ≥ <select id="minScore"><option>0</option><option selected>15</option><option>25</option><option>40</option><option value="-999">mọi</option></select></label>
+      <label>Xếp theo <select id="sort"><option value="ai">AI phù hợp</option><option value="score">Điểm từ khoá</option><option value="new">Mới nhất</option></select></label>
+      <label><input type="checkbox" id="regionOnly" checked> Chỉ job nhận người ở VN</label>
+    </div>
+  </div>
+</header>
+<dialog id="kitDialog">
+  <div class="dlg-head">
+    <h2 id="kitTitle"></h2>
+    <button id="kitRegen" class="ai">↻ Viết lại</button>
+    <button id="kitClose">Đóng</button>
+  </div>
+  <div class="dlg-body" id="kitBody"></div>
+</dialog>
+<div class="wrap">
+  <div class="setup" id="aiSetup" hidden>
+    <b>AI đang tắt</b> nên chưa có “10 điểm chính”, điểm AI và nút “✍️ AI chuẩn bị apply”. Để bật:
+    <ol>
+      <li>Lấy key miễn phí tại <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (project không gắn thẻ thanh toán).</li>
+      <li>Trong thư mục <code>~/FREE/JobRadar</code>: chạy <code>cp .env.example .env</code>, mở <code>.env</code> và dán key vào dòng <code>GEMINI_API_KEY=</code>.</li>
+      <li>Điền <code>profile.md</code> (kỹ năng, dự án, giá) để AI viết proposal đúng về bạn.</li>
+      <li>Tắt server rồi chạy lại <code>npm start</code>, sau đó tải lại trang này.</li>
+    </ol>
+  </div>
+</div>
+<main class="wrap" id="list"></main>
+<footer class="wrap">
+  <div id="sources"></div>
+  <p>Dữ liệu từ
+    <a href="https://www.freelancer.com" target="_blank" rel="noopener">Freelancer.com</a>,
+    <a href="https://remotive.com" target="_blank" rel="noopener">Remotive</a>,
+    <a href="https://remoteok.com" target="_blank" rel="noopener">Remote OK</a>,
+    <a href="https://himalayas.app" target="_blank" rel="noopener">Himalayas</a>,
+    <a href="https://jobicy.com" target="_blank" rel="noopener">Jobicy</a> và
+    <a href="https://weworkremotely.com" target="_blank" rel="noopener">We Work Remotely</a>.
+    Mỗi job dẫn về trang gốc để nộp đơn.</p>
+</footer>
+<script>
+const TABS = [['new', 'Mới'], ['saved', 'Đã lưu'], ['applied', 'Đã nộp'], ['hidden', 'Đã ẩn'], ['all', 'Tất cả']];
+const state = { status: 'new' };
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+function ago(iso) {
+  if (!iso) return '';
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (m < 60) return `${Math.max(m, 1)} phút trước`;
+  if (m < 1440) return `${Math.round(m / 60)} giờ trước`;
+  return `${Math.round(m / 1440)} ngày trước`;
+}
+
+function renderTabs(counts = {}) {
+  const tabs = $('tabs');
+  tabs.replaceChildren(...TABS.map(([key, label]) => {
+    const n = key === 'all' ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[key] || 0;
+    const b = el('button', 'tab' + (state.status === key ? ' on' : ''), `${label} (${n})`);
+    b.onclick = () => { state.status = key; load(); };
+    return b;
+  }));
+}
+
+async function setStatus(job, status, card) {
+  await fetch(`/api/jobs/${encodeURIComponent(job.id)}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+  if (state.status !== 'all') card.remove();
+  load(false);
+}
+
+function renderJob(job) {
+  const card = el('article', 'job' + (job.region_ok ? '' : ' restricted'));
+  const row = el('div', 'row');
+  const hasAi = job.ai_score != null;
+  const v = hasAi ? job.ai_score : job.score;
+  const s = el('div', 'score' + ((hasAi ? v >= 70 : v >= 35) ? ' hi' : (hasAi ? v >= 45 : v >= 20) ? ' mid' : ''), String(v));
+  s.append(el('small', '', hasAi ? `AI · tk ${job.score}` : 'từ khoá'));
+  s.title = hasAi ? 'Gemini đánh giá mức phù hợp (0–100); "tk" là điểm từ khoá' : 'Điểm từ khoá (chưa có AI chấm)';
+  const body = el('div', 'body');
+  const a = el('a', 'title', job.title);
+  a.href = job.url; a.target = '_blank'; a.rel = 'noopener';
+  const meta = el('div', 'meta');
+  meta.append(el('span', '', job.source));
+  if (job.company) meta.append(el('span', '', job.company));
+  if (job.budget_text) meta.append(el('span', 'money', job.budget_text));
+  if (job.bid_count != null) meta.append(el('span', job.bid_count < 10 ? 'money' : '', `${job.bid_count} người đã bid`));
+  if (job.kind) meta.append(el('span', '', job.kind));
+  if (job.location) meta.append(el('span', job.region_ok ? '' : 'warn', (job.region_ok ? '📍 ' : '⛔ ') + job.location));
+  meta.append(el('span', '', ago(job.posted_at || job.first_seen)));
+  const chips = el('div', 'chips');
+  job.matched.forEach((m) => chips.append(el('span', 'chip', m)));
+  if (job.ai_scam === 'high' || job.ai_scam === 'medium') chips.append(el('span', 'chip scam', job.ai_scam === 'high' ? '⚠️ Nghi lừa đảo' : '⚠️ Cần cẩn thận'));
+  const desc = el('div', 'desc clamp', job.description.slice(0, 2500));
+  desc.title = 'Bấm để xem thêm';
+  desc.onclick = () => desc.classList.toggle('clamp');
+  const actions = el('div', 'actions');
+  const add = (label, status) => { if (job.status !== status) { const b = el('button', '', label); b.onclick = () => setStatus(job, status, card); actions.append(b); } };
+  if (aiOn) {
+    const kitBtn = el('button', 'ai', job.has_kit ? '📄 Xem bộ apply' : '✍️ AI chuẩn bị apply');
+    kitBtn.title = 'Gemini viết proposal, giá bid, câu trả lời form… để bạn copy vào trang apply';
+    kitBtn.onclick = () => openKit(job);
+    actions.append(kitBtn);
+    if (!hasAi) {
+      const sc = el('button', 'ai', '🤖 AI chấm');
+      sc.onclick = async () => {
+        sc.disabled = true; sc.textContent = 'Đang chấm…';
+        const r = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/ai-score`, { method: 'POST' });
+        const data = await r.json();
+        if (!r.ok) { sc.disabled = false; sc.textContent = '🤖 AI chấm'; alert(data.error); return; }
+        card.replaceWith(renderJob(data.job));
+      };
+      actions.append(sc);
+    }
+  }
+  add('⭐ Lưu', 'saved'); add('✅ Đã nộp', 'applied'); add('🙈 Ẩn', 'hidden'); add('↩︎ Về Mới', 'new');
+  body.append(a, meta);
+  if (job.matched.length || job.ai_scam === 'high' || job.ai_scam === 'medium') body.append(chips);
+  if (job.ai_reason) body.append(el('div', 'ai-reason', '🤖 ' + job.ai_reason));
+  if (job.ai_flags?.length) body.append(el('div', 'ai-flags', '⚠️ ' + job.ai_flags.join(' · ')));
+  if (job.ai_highlights) hlCache.set(job.id, job.ai_highlights);
+  if (hlCache.has(job.id) || aiOn) {
+    const hl = el('div', 'hl');
+    hl.dataset.id = job.id;
+    body.append(hl);
+    card.dataset.id = job.id;
+    if (hlCache.has(job.id)) fillHighlights(hl, hlCache.get(job.id));
+    else { setWait(hl, '🤖 AI sẽ tóm tắt khi bạn cuộn tới'); hlObserver.observe(card); }
+  }
+  body.append(desc, actions);
+  row.append(s, body);
+  card.append(row);
+  return card;
+}
+
+function renderSources(sources) {
+  const box = $('sources');
+  box.replaceChildren(...Object.entries(sources).map(([name, s]) => {
+    const line = el('div', s.ok ? 'src-ok' : 'src-err');
+    line.textContent = s.ok
+      ? `✓ ${name}: ${s.fetched} job (${s.fresh} mới) · ${ago(s.lastAttempt)}`
+      : `✗ ${name}: lỗi "${s.error}" · ${ago(s.lastAttempt)}`;
+    return line;
+  }));
+}
+
+// ---- AI highlights: only for cards on screen, fetched as you scroll ----
+const hlCache = new Map();   // id -> points[]
+const visible = new Set();   // ids of cards currently on screen
+const requested = new Set(); // ids asked for and not answered yet
+let hlBusy = false, hlTimer;
+
+function setWait(box, text, busy = false) {
+  box.className = 'hl wait' + (busy ? ' busy' : '');
+  box.replaceChildren(document.createTextNode(text));
+}
+
+function fillHighlights(box, points) {
+  box.className = 'hl';
+  const ul = el('ul');
+  points.forEach((p) => ul.append(el('li', '', p)));
+  box.replaceChildren(el('div', 'hl-title', `${points.length} điểm chính (AI tóm tắt)`), ul);
+}
+
+const boxFor = (id) => document.querySelector(`.hl[data-id="${CSS.escape(id)}"]`);
+
+const hlObserver = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    const id = e.target.dataset.id;
+    if (e.isIntersecting) visible.add(id); else visible.delete(id);
+  }
+  clearTimeout(hlTimer);
+  hlTimer = setTimeout(flushHighlights, 350); // wait until scrolling settles
+}, { rootMargin: '80px 0px' });
+
+async function flushHighlights() {
+  if (hlBusy || !aiOn) return;
+  const ids = [...visible].filter((id) => !hlCache.has(id) && !requested.has(id) && boxFor(id)).slice(0, 10);
+  if (!ids.length) return;
+  hlBusy = true;
+  ids.forEach((id) => { requested.add(id); const b = boxFor(id); if (b) setWait(b, '🤖 Đang tóm tắt…', true); });
+  let data = {};
+  try {
+    const r = await fetch('/api/highlights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+    data = await r.json();
+    if (!r.ok) data = { highlights: {}, error: data.error };
+  } catch (err) {
+    data = { highlights: {}, error: err.message };
+  }
+  for (const id of ids) {
+    requested.delete(id);
+    const box = boxFor(id);
+    const points = data.highlights?.[id];
+    if (points) {
+      hlCache.set(id, points);
+      if (box) { fillHighlights(box, points); hlObserver.unobserve(box.closest('.job')); }
+    } else if (box) {
+      setWait(box, '⚠️ Chưa tóm tắt được' + (data.error ? `: ${data.error}` : ''));
+      const retry = el('button', '', 'Thử lại');
+      retry.onclick = () => { requested.delete(id); visible.add(id); flushHighlights(); };
+      box.append(retry);
+      hlCache.delete(id);
+      visible.delete(id); // no automatic retry loop; the button retries
+    }
+  }
+  hlBusy = false;
+  flushHighlights(); // cards that came into view meanwhile
+}
+
+// ---- Apply kit (AI-written application) ----
+let kitJob = null;
+
+function copyBtn(getText) {
+  const b = el('button', '', 'Copy');
+  b.onclick = async () => {
+    try { await navigator.clipboard.writeText(getText()); b.textContent = 'Đã copy ✓'; }
+    catch { b.textContent = 'Không copy được'; }
+    setTimeout(() => (b.textContent = 'Copy'), 1500);
+  };
+  return b;
+}
+
+function section(title, content, copyText, cls = '') {
+  const sec = el('div', 'kit-sec ' + cls);
+  const h = el('h3', '', title);
+  if (copyText) h.append(copyBtn(() => copyText));
+  sec.append(h);
+  if (typeof content === 'string') sec.append(el('div', 'kit-text', content));
+  else sec.append(content);
+  return sec;
+}
+
+function list(items) {
+  const ul = el('ul');
+  items.forEach((t) => ul.append(el('li', '', t)));
+  return ul;
+}
+
+const UNIT = { fixed: 'trọn gói', hourly: '/giờ', monthly_salary: '/tháng', yearly_salary: '/năm' };
+
+function renderKit(job, kit) {
+  const body = $('kitBody');
+  const parts = [];
+  const open = el('a', '', 'Mở trang job để apply ↗'); open.href = job.url; open.target = '_blank'; open.rel = 'noopener';
+  parts.push(el('div', 'kit-sec', ''));
+  parts[0].append(open, el('span', '', `  ·  viết bởi ${kit.model} lúc ${new Date(kit.created_at).toLocaleString('vi-VN')}`));
+  parts.push(section('Khách cần gì', kit.job_summary_vi));
+  if (kit.missing_info_vi?.length) parts.push(section('⚠️ Bạn cần điền / kiểm tra trước khi gửi', list(kit.missing_info_vi), null, 'missing'));
+  if (kit.subject_line) parts.push(section('Tiêu đề / dòng mở đầu', kit.subject_line, kit.subject_line));
+  parts.push(section('Proposal / Cover letter', kit.proposal, kit.proposal));
+  const b = kit.bid || {};
+  const bidText = `${b.amount ?? '?'} ${b.currency ?? ''} ${UNIT[b.unit] ?? b.unit ?? ''}${b.delivery_days ? ` · giao trong ${b.delivery_days} ngày` : ''}`;
+  const bidBox = el('div');
+  bidBox.append(el('div', 'kit-text', bidText), el('div', 'desc', b.rationale_vi || ''));
+  parts.push(section('Giá đề xuất', bidBox, String(b.amount ?? '')));
+  if (kit.milestones?.length) {
+    const t = kit.milestones.map((m, i) => `${i + 1}. ${m.title} — ${m.amount} ${b.currency ?? ''}${m.days ? ` (${m.days} ngày)` : ''}`).join('\n');
+    parts.push(section('Milestones', t, t));
+  }
+  if (kit.screening_answers?.length) {
+    const box = el('div');
+    kit.screening_answers.forEach(({ question, answer }) => {
+      const qa = el('div', 'qa');
+      const q = el('b', '', question + ' ');
+      q.append(copyBtn(() => answer));
+      qa.append(q, el('div', 'kit-text', answer));
+      box.append(qa);
+    });
+    parts.push(section('Câu hỏi trong form & câu trả lời', box));
+  }
+  if (kit.questions_for_client?.length) parts.push(section('Câu nên hỏi lại khách', list(kit.questions_for_client), kit.questions_for_client.join('\n')));
+  if (kit.profile_highlights?.length) parts.push(section('Điểm mạnh nên nêu (CV / headline)', list(kit.profile_highlights), kit.profile_highlights.map((x) => '• ' + x).join('\n')));
+  if (kit.tips_vi?.length) parts.push(section('Mẹo để thắng job này', list(kit.tips_vi)));
+  body.replaceChildren(...parts);
+}
+
+async function fetchKit(job, regenerate) {
+  $('kitBody').replaceChildren(el('div', 'loading', '🤖 Gemini đang đọc job và viết bộ apply… (khoảng 10–40 giây)'));
+  $('kitRegen').disabled = true;
+  try {
+    const r = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/apply-kit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ regenerate }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+    renderKit(job, data.kit);
+    job.has_kit = true;
+  } catch (err) {
+    $('kitBody').replaceChildren(el('div', 'loading', '❌ ' + err.message));
+  } finally {
+    $('kitRegen').disabled = false;
+  }
+}
+
+function openKit(job) {
+  kitJob = job;
+  $('kitTitle').textContent = job.title;
+  $('kitDialog').showModal();
+  fetchKit(job, false);
+}
+$('kitClose').onclick = () => { $('kitDialog').close(); load(); };
+$('kitRegen').onclick = () => kitJob && fetchKit(kitJob, true);
+
+let timer, aiOn = false;
+async function load(full = true) {
+  const p = new URLSearchParams({ status: state.status, minScore: $('minScore').value, source: $('source').value, q: $('q').value.trim(), regionOnly: $('regionOnly').checked ? '1' : '0', sort: $('sort').value });
+  const data = await (await fetch('/api/jobs?' + p)).json();
+  aiOn = data.ai;
+  $('aiSetup').hidden = aiOn;
+  renderTabs(data.counts);
+  renderSources(data.sources);
+  const srcSel = $('source');
+  const known = new Set([...srcSel.options].map((o) => o.value));
+  const names = { freelancer: 'Freelancer.com', remotive: 'Remotive', remoteok: 'Remote OK', himalayas: 'Himalayas', himalayasVietnam: 'Himalayas', jobicy: 'Jobicy', weworkremotely: 'We Work Remotely' };
+  Object.keys(data.sources).forEach((k) => { const v = names[k] || k; if (!known.has(v)) srcSel.append(new Option(v, v)); });
+  const last = data.lastRun ? `Lần quét cuối ${ago(data.lastRun.at)} · ${data.lastRun.newCount} job mới` : 'Chưa quét lần nào';
+  const aiText = !data.ai ? 'AI chưa cấu hình' : data.aiStatus && !data.aiStatus.ok ? `AI lỗi: ${data.aiStatus.error}` : 'AI Gemini đang bật';
+  $('statusLine').textContent = `${last} · tự quét mỗi ${data.intervalMinutes} phút · Telegram ${data.telegram ? 'đang bật' : 'chưa cấu hình'} · ${aiText}`;
+  if (!full) return;
+  hlObserver.disconnect();
+  visible.clear();
+  const list = $('list');
+  list.replaceChildren(...(data.jobs.length ? data.jobs.map(renderJob) : [el('div', 'empty', 'Chưa có job nào khớp bộ lọc. Thử hạ "Điểm ≥" hoặc bỏ tick "Chỉ job nhận người ở VN".')]));
+}
+
+$('refresh').onclick = async () => {
+  const b = $('refresh'); b.disabled = true; b.textContent = 'Đang quét…';
+  try { await fetch('/api/refresh', { method: 'POST' }); } finally { b.disabled = false; b.textContent = 'Quét ngay'; load(); }
+};
+['minScore', 'source', 'regionOnly', 'sort'].forEach((id) => $(id).addEventListener('change', () => load()));
+$('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250); });
+load();
+setInterval(() => load(false), 60000);
+</script>
+</body>
+</html>

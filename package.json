@@ -1,0 +1,15 @@
+{
+  "name": "jobradar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Collects remote and freelance jobs from public APIs, scores them against your skills, shows them on a local web page and pings Telegram.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "fetch": "node --disable-warning=ExperimentalWarning src/run.js",
+    "telegram:chatid": "node src/telegram-chatid.js"
+  }
+}

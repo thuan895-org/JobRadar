@@ -1,0 +1,56 @@
+{
+  "port": 4321,
+  "intervalMinutes": 60,
+  "sources": {
+    "freelancer": { "enabled": true, "minIntervalMinutes": 60 },
+    "remotive": { "enabled": true, "minIntervalMinutes": 360 },
+    "remoteok": { "enabled": true, "minIntervalMinutes": 120 },
+    "himalayas": { "enabled": true, "minIntervalMinutes": 180, "pages": 5 },
+    "himalayasVietnam": { "enabled": true, "minIntervalMinutes": 180 },
+    "jobicy": { "enabled": true, "minIntervalMinutes": 180 },
+    "weworkremotely": { "enabled": true, "minIntervalMinutes": 120 }
+  },
+  "freelancerQueries": [
+    "react", "next.js", "node.js", "typescript", "flutter", "react native",
+    "mobile app", "web app", "chrome extension", "automation", "scraping",
+    "chatbot", "openai", "ai agent", "llm", "mcp", "claude",
+    "vietnamese", "translation vietnamese"
+  ],
+  "himalayasVietnamQueries": [
+    "react", "node", "typescript", "full stack", "frontend", "flutter", "react native",
+    "mobile", "ai", "llm", "automation", "python", "vietnamese", "translation"
+  ],
+  "skills": [
+    { "label": "Web", "weight": 10, "terms": ["react", "next.js", "nextjs", "vue", "nuxt", "angular", "node.js", "nodejs", "typescript", "javascript", "full stack", "fullstack", "frontend", "front-end", "backend", "back-end", "express", "nestjs", "laravel", "wordpress", "web app", "website", "lập trình web", "thiết kế website", "trang web"] },
+    { "label": "Mobile", "weight": 10, "terms": ["flutter", "react native", "ios", "android", "mobile app", "swift", "kotlin", "expo", "ứng dụng di động", "app di động"] },
+    { "label": "Tool/Automation", "weight": 8, "terms": ["automation", "scraper", "scraping", "web scraping", "chrome extension", "browser extension", "zapier", "n8n", "make.com", "api integration", "telegram bot", "discord bot", "chatbot", "tự động hóa", "tự động hoá", "phần mềm", "lập trình", "công cụ"] },
+    { "label": "AI/MCP", "weight": 12, "terms": ["mcp", "model context protocol", "llm", "openai", "gpt", "chatgpt", "claude", "anthropic", "gemini", "ai agent", "ai agents", "rag", "langchain", "chatbot", "ai integration", "ai automation", "trí tuệ nhân tạo"] },
+    { "label": "Dịch tiếng Việt", "weight": 15, "requireAny": ["vietnamese", "tiếng việt", "vietnam", "dịch thuật", "biên dịch", "phiên dịch"], "terms": ["vietnamese", "tiếng việt", "localization", "localisation", "translation", "translator", "translate", "subtitle", "proofreading", "dịch thuật", "biên dịch", "phiên dịch", "phụ đề"] }
+  ],
+  "excludeTitleTerms": [
+    "director", "vp ", "vice president", "head of", "principal", "staff engineer",
+    "sales", "account executive", "recruiter", "nurse", "physician", "therapist",
+    "accountant", "lawyer", "attorney"
+  ],
+  "regionOkTerms": [
+    "anywhere", "worldwide", "global", "asia", "apac", "vietnam",
+    "southeast asia", "all regions", "international", "any location"
+  ],
+  "minBudgetUsd": 30,
+  "ai": {
+    "models": ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
+    "fastModels": ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
+    "fastTimeoutSeconds": 40,
+    "kitTimeoutSeconds": 90,
+    "minKeywordScore": 20,
+    "maxPerRun": 30,
+    "batchSize": 10,
+    "retryPauseMs": 15000,
+    "notifyMinFit": 60
+  },
+  "telegram": {
+    "minScore": 25,
+    "maxPerRun": 10,
+    "maxAgeHours": 48
+  }
+}
