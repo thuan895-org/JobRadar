@@ -10,6 +10,10 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/server.js",
     "fetch": "node --disable-warning=ExperimentalWarning src/run.js",
-    "telegram:chatid": "node src/telegram-chatid.js"
+    "telegram:chatid": "node src/telegram-chatid.js",
+    "migrate": "node --disable-warning=ExperimentalWarning src/migrate-sqlite.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
   }
 }

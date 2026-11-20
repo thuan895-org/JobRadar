@@ -2,14 +2,19 @@
 
 Tự động gom job remote / freelance từ các nguồn **có API công khai**, chấm điểm theo kỹ năng của bạn, hiển thị trên trang web `http://localhost:4321` và báo job mới qua Telegram.
 
-Chỉ cần Node.js 22.5 trở lên, không cần `npm install`.
+Cần Node.js 22.5 trở lên và một database Postgres (dùng [Neon](https://neon.tech) miễn phí). Mọi kết quả AI được lưu theo id job trong database, nên mỗi job chỉ gọi AI một lần cho mỗi loại kết quả.
 
-## Chạy
+## Chạy trên máy
+
+1. `cp .env.example .env`, dán connection string của Neon vào `DATABASE_URL=`. Nên tạo một branch `dev` trên Neon để dùng ở máy, tách khỏi dữ liệu thật.
+2. Cài thư viện và chạy:
 
 ```bash
-cd ~/FREE/JobRadar
+npm install
 npm start
 ```
+
+Trên Windows PowerShell, nếu báo "running scripts is disabled", dùng `npm.cmd install` và `npm.cmd start`.
 
 Sau đó mở http://localhost:4321. Server tự quét mỗi 60 phút (mỗi nguồn có giới hạn riêng trong `config.json` để không gọi API quá nhiều). Nút **Quét ngay** quét tất cả ngay lập tức.
 
@@ -58,6 +63,51 @@ Các nguồn này yêu cầu dẫn link về trang gốc; JobRadar luôn làm v�
 
 **Upwork không có trong danh sách** vì Upwork đã tắt RSS (08/2024) và điều khoản cấm cào trang hoặc theo dõi liên tục. Với Upwork, dùng *Saved search* + thông báo email trên chính Upwork.
 
+## Đưa lên mạng: Render + Neon + cron job
+
+Server trên Render bản miễn phí sẽ **ngủ** sau khoảng 15 phút không ai truy cập và **không giữ file** giữa các lần deploy. Vì vậy dữ liệu nằm trên Neon, còn việc quét định kỳ do cron job gọi từ bên ngoài. Lần đầu mở trang sau khi server ngủ phải chờ khoảng 30–60 giây.
+
+### 1. Neon
+
+1. Tạo **project mới** (hoặc ít nhất một database riêng), đừng dùng chung database với trang web khác.
+2. Vào **Connect**, chọn connection string loại **pooled**, copy lại để dùng cho `DATABASE_URL`.
+3. Bảng được tạo tự động khi server chạy lần đầu.
+4. Muốn mang dữ liệu cũ (kể cả kết quả AI) từ `data/jobs.sqlite` lên: đặt `DATABASE_URL` trong `.env` ở máy rồi chạy `npm run migrate`. Chạy lại nhiều lần cũng không bị trùng.
+
+### 2. Render
+
+1. **New → Web Service**, chọn repo này.
+2. Build command: `npm install`. Start command: `npm start`. Instance type: Free.
+3. Phần **Environment**, thêm các biến:
+
+| Biến | Giá trị |
+|---|---|
+| `DATABASE_URL` | connection string của Neon |
+| `APP_PASSWORD` | mật khẩu vào trang, ít nhất 8 ký tự (bắt buộc, thiếu thì server không chạy) |
+| `SESSION_SECRET` | chuỗi ngẫu nhiên dài (tuỳ chọn) |
+| `CRON_SECRET` | chuỗi ngẫu nhiên dài, dùng cho cron job |
+| `PUBLIC_URL` | địa chỉ Render cấp, ví dụ `https://jobradar.onrender.com` |
+| `GEMINI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | như khi chạy trên máy (tuỳ chọn) |
+
+4. Phần **Secret Files**, thêm file tên `profile.md` với nội dung hồ sơ của bạn (file này không có trong git).
+5. Health check path: `/healthz`.
+
+Tạo chuỗi ngẫu nhiên: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+### 3. Cron job (ví dụ cron-job.org)
+
+- URL: `https://<địa-chỉ-render>/api/cron/scan`, method GET hoặc POST.
+- Header: `Authorization: Bearer <CRON_SECRET>`. Dịch vụ cron nào không cho thêm header thì dùng `?key=<CRON_SECRET>` ở cuối URL.
+- Lịch: mỗi 60 phút.
+
+Endpoint trả lời ngay (`202`) rồi quét ở nền, nên cron không bị quá thời gian chờ. Hai lần gọi chồng nhau thì chỉ có một lượt quét. Mỗi nguồn vẫn giữ giới hạn riêng trong `config.json`.
+
+Lưu ý: số giờ chạy miễn phí của Render tính chung cho cả tài khoản. Nếu bạn còn web service miễn phí khác, đừng cài cron dày hơn mức cần để giữ server thức suốt ngày.
+
+### Dọn dữ liệu
+
+Sau mỗi lượt quét, job ở tab Mới / Đã ẩn mà không nguồn nào còn đăng trong `retentionDays` ngày (mặc định 60, trong `config.json`) sẽ bị xoá để database không vượt gói miễn phí. Job đã **Lưu** hoặc **Đã nộp** được giữ lại cùng kết quả AI.
+
 ## Chỉnh cho đúng ý bạn — `config.json`
 
 - `skills`: nhóm kỹ năng, từ khoá và trọng số. Khớp ở tiêu đề được nhân 2, ở tag tính 1, chỉ trong mô tả thì tính nửa và cần ít nhất 2 từ khoá.
@@ -73,8 +123,9 @@ Các nguồn này yêu cầu dẫn link về trang gốc; JobRadar luôn làm v�
 ```
 src/sources.js   lấy job từ từng nguồn, chuẩn hoá về một dạng
 src/score.js     chấm điểm theo config.json
-src/db.js        lưu vào data/jobs.sqlite (SQLite có sẵn trong Node)
+src/db.js        lưu vào Postgres (Neon), kể cả kết quả AI theo id job
 src/run.js       một lượt quét + gửi Telegram
-src/server.js    trang web + lịch quét tự động
+src/server.js    trang web, đăng nhập, endpoint cho cron + lịch quét khi server thức
+src/migrate-sqlite.js  chép dữ liệu cũ từ data/jobs.sqlite sang Postgres
 public/index.html giao diện
 ```

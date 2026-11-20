@@ -22,6 +22,7 @@
   header { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line); }
   .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
   .top { display: flex; align-items: center; gap: 12px; padding: 14px 0 10px; flex-wrap: wrap; }
+  #logout { font-size: 13px; color: inherit; opacity: .7; }
   h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
   .status-line { color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
   button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; padding: 6px 12px; }
@@ -102,6 +103,7 @@
       <h1>📡 JobRadar</h1>
       <div class="status-line" id="statusLine">Đang tải…</div>
       <button class="primary" id="refresh">Quét ngay</button>
+      <a id="logout" href="/logout" hidden>Đăng xuất</a>
     </div>
     <div class="tabs" id="tabs"></div>
     <div class="filters">
@@ -149,6 +151,14 @@ const TABS = [['new', 'Mới'], ['saved', 'Đã lưu'], ['applied', 'Đã nộp'
 const state = { status: 'new' };
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+// Session expired or never logged in: go to the login page.
+const rawFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const r = await rawFetch(...args);
+  if (r.status === 401) { location.href = '/login'; throw new Error('Cần đăng nhập lại'); }
+  return r;
+};
 
 function ago(iso) {
   if (!iso) return '';
@@ -418,7 +428,8 @@ async function load(full = true) {
   Object.keys(data.sources).forEach((k) => { const v = names[k] || k; if (!known.has(v)) srcSel.append(new Option(v, v)); });
   const last = data.lastRun ? `Lần quét cuối ${ago(data.lastRun.at)} · ${data.lastRun.newCount} job mới` : 'Chưa quét lần nào';
   const aiText = !data.ai ? 'AI chưa cấu hình' : data.aiStatus && !data.aiStatus.ok ? `AI lỗi: ${data.aiStatus.error}` : 'AI Gemini đang bật';
-  $('statusLine').textContent = `${last} · tự quét mỗi ${data.intervalMinutes} phút · Telegram ${data.telegram ? 'đang bật' : 'chưa cấu hình'} · ${aiText}`;
+  $('logout').hidden = !data.loginEnabled;
+  $('statusLine').textContent = `${last}${data.scanning ? ' · đang quét…' : ''} · tự quét mỗi ${data.intervalMinutes} phút · Telegram ${data.telegram ? 'đang bật' : 'chưa cấu hình'} · ${aiText}`;
   if (!full) return;
   hlObserver.disconnect();
   visible.clear();

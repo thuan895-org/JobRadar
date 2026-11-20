@@ -1,6 +1,7 @@
 {
   "port": 4321,
   "intervalMinutes": 60,
+  "retentionDays": 60,
   "sources": {
     "freelancer": { "enabled": true, "minIntervalMinutes": 60 },
     "remotive": { "enabled": true, "minIntervalMinutes": 360 },

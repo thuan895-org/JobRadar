@@ -14,9 +14,13 @@ export function aiConfigured() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
+// profile.md is not in git. On Render, upload it as a Secret File named
+// profile.md: it is then readable at /etc/secrets/profile.md.
+const PROFILE_PATHS = () => [process.env.PROFILE_PATH, join(ROOT, 'profile.md'), '/etc/secrets/profile.md'].filter(Boolean);
+
 export function readProfile() {
-  const file = join(ROOT, 'profile.md');
-  if (!existsSync(file)) return '(no profile.md yet)';
+  const file = PROFILE_PATHS().find((p) => existsSync(p));
+  if (!file) return '(no profile.md yet)';
   // A field still in [brackets] is the template's example, not a fact about
   // the user. Hide the example so the model cannot present it as real.
   // Markdown links "[text](url)" are left alone.

@@ -19,7 +19,7 @@ export async function sendTelegram(html) {
   }
 }
 
-export function formatJob(job, port) {
+export function formatJob(job, appUrl) {
   const lines = [
     `<b>${esc(job.title)}</b>`,
     [job.source, job.company].filter(Boolean).map(esc).join(' · '),
@@ -35,6 +35,6 @@ export function formatJob(job, port) {
   if (job.ai_flags?.length) lines.push(`⚠️ ${esc(job.ai_flags.join('; '))}`);
   const snippet = (job.description || '').replace(/\s+/g, ' ').slice(0, 220);
   if (snippet) lines.push(`<i>${esc(snippet)}…</i>`);
-  lines.push(`<a href="${esc(job.url)}">Mở job</a> · <a href="http://localhost:${port}">JobRadar</a>`);
+  lines.push(`<a href="${esc(job.url)}">Mở job</a> · <a href="${esc(appUrl)}">JobRadar</a>`);
   return lines.join('\n');
 }
