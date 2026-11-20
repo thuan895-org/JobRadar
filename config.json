@@ -12,21 +12,25 @@
     "weworkremotely": { "enabled": true, "minIntervalMinutes": 120 }
   },
   "freelancerQueries": [
-    "react", "next.js", "node.js", "typescript", "flutter", "react native",
-    "mobile app", "web app", "chrome extension", "automation", "scraping",
-    "chatbot", "openai", "ai agent", "llm", "mcp", "claude",
-    "vietnamese", "translation vietnamese"
+    "node.js", "nestjs", "java", "spring boot", "typescript", "backend", "microservices",
+    "aws", "docker", "kubernetes",
+    "twilio", "voip", "sms",
+    "mcp", "ai agent", "llm", "openai", "claude", "automation",
+    "vietnamese"
   ],
   "himalayasVietnamQueries": [
-    "react", "node", "typescript", "full stack", "frontend", "flutter", "react native",
-    "mobile", "ai", "llm", "automation", "python", "vietnamese", "translation"
+    "backend", "node", "nestjs", "java", "typescript", "full stack", "devops", "aws",
+    "ai", "llm", "automation", "telecom", "vietnamese"
   ],
   "skills": [
-    { "label": "Web", "weight": 10, "terms": ["react", "next.js", "nextjs", "vue", "nuxt", "angular", "node.js", "nodejs", "typescript", "javascript", "full stack", "fullstack", "frontend", "front-end", "backend", "back-end", "express", "nestjs", "laravel", "wordpress", "web app", "website", "lập trình web", "thiết kế website", "trang web"] },
-    { "label": "Mobile", "weight": 10, "terms": ["flutter", "react native", "ios", "android", "mobile app", "swift", "kotlin", "expo", "ứng dụng di động", "app di động"] },
-    { "label": "Tool/Automation", "weight": 8, "terms": ["automation", "scraper", "scraping", "web scraping", "chrome extension", "browser extension", "zapier", "n8n", "make.com", "api integration", "telegram bot", "discord bot", "chatbot", "tự động hóa", "tự động hoá", "phần mềm", "lập trình", "công cụ"] },
+    { "label": "Backend", "weight": 12, "terms": ["java", "spring boot", "spring", "node.js", "nodejs", "nestjs", "typescript", "express", "typeorm", "mysql", "postgresql", "redis", "kafka", "rabbitmq", "microservice", "microservices", "rest api", "api integration", "webhook", "webhooks", "backend", "back-end", "lập trình backend"] },
+    { "label": "Tổng đài/CPaaS", "weight": 12, "terms": ["cpaas", "twilio", "vonage", "plivo", "voip", "sip", "ivr", "call center", "contact center", "auto dialer", "autodialer", "dialer", "call routing", "call recording", "sms", "rcs", "fax", "asterisk", "freeswitch", "tổng đài"] },
     { "label": "AI/MCP", "weight": 12, "terms": ["mcp", "model context protocol", "llm", "openai", "gpt", "chatgpt", "claude", "anthropic", "gemini", "ai agent", "ai agents", "rag", "langchain", "chatbot", "ai integration", "ai automation", "trí tuệ nhân tạo"] },
-    { "label": "Dịch tiếng Việt", "weight": 15, "requireAny": ["vietnamese", "tiếng việt", "vietnam", "dịch thuật", "biên dịch", "phiên dịch"], "terms": ["vietnamese", "tiếng việt", "localization", "localisation", "translation", "translator", "translate", "subtitle", "proofreading", "dịch thuật", "biên dịch", "phiên dịch", "phụ đề"] }
+    { "label": "Cloud/DevOps", "weight": 8, "terms": ["aws", "azure", "docker", "kubernetes", "k8s", "devops", "ci/cd"] },
+    { "label": "Tool/Automation", "weight": 6, "terms": ["automation", "scraper", "scraping", "web scraping", "zapier", "n8n", "make.com", "telegram bot", "discord bot", "tự động hóa", "tự động hoá"] },
+    { "label": "Web", "weight": 5, "terms": ["full stack", "fullstack", "react", "next.js", "nextjs", "javascript", "web app", "lập trình web"] },
+    { "label": "Mobile", "weight": 5, "terms": ["react native", "mobile app", "android", "ios", "expo", "ứng dụng di động", "app di động"] },
+    { "label": "Dịch tiếng Việt", "weight": 5, "requireAny": ["vietnamese", "tiếng việt", "vietnam", "dịch thuật", "biên dịch", "phiên dịch"], "terms": ["vietnamese", "tiếng việt", "localization", "localisation", "translation", "translator", "translate", "subtitle", "proofreading", "dịch thuật", "biên dịch", "phiên dịch", "phụ đề"] }
   ],
   "excludeTitleTerms": [
     "director", "vp ", "vice president", "head of", "principal", "staff engineer",
