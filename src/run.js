@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url';
 import { loadConfig, loadEnv } from './util.js';
 import { SOURCES } from './sources.js';
 import { scoreJob } from './score.js';
-import { initDb, pool, upsertJob, getMeta, setMeta, pendingNotifications, markNotified, silenceOlderThan, aiCandidates, saveAiScore, getJob, deleteStaleJobs } from './db.js';
+import { initDb, pool, upsertJob, getMeta, setMeta, pendingNotifications, markNotified, silenceIneligible, silenceAll, aiCandidates, saveAiScore, getJob, deleteStaleJobs } from './db.js';
 import { telegramConfigured, sendTelegram, formatJob } from './telegram.js';
 import { aiConfigured, scoreJobs } from './ai.js';
 
@@ -88,19 +88,30 @@ async function scan({ force }) {
       await setMeta('sourceStatus', status);
     }
 
+    // A job gets a Telegram decision once: sent, or settled as not worth sending.
+    // Until then it stays pending and is looked at again on every scan, for as
+    // long as it is recent enough (telegram.maxAgeHours).
+    const tg = config.telegram;
+    if (telegramConfigured()) await silenceIneligible({ minScore: tg.minScore, maxAgeHours: tg.maxAgeHours });
+
+    // Pending jobs are first in line for Gemini (see aiCandidates).
     const ai = await aiScorePending(config);
 
-    // On the first run everything is new; maxPerRun keeps it to the best few.
     let sent = 0;
     if (telegramConfigured()) {
-      let pending = await pendingNotifications({ minScore: config.telegram.minScore, maxAgeHours: config.telegram.maxAgeHours, sinceIso: startedAt });
-      // With AI on, only jobs Gemini rated well (and not as likely scams) are sent.
+      let pending = await pendingNotifications({ minScore: tg.minScore, maxAgeHours: tg.maxAgeHours });
+      // With AI on, Gemini has the final say. A job it rated low (or as a likely
+      // scam) is settled; one it has not read yet waits for the next scan.
+      // If Gemini failed this time, the keyword score decides, as without AI.
       if (aiConfigured() && !ai.error) {
+        const rejected = pending.filter((j) => j.ai_score != null && (j.ai_score < config.ai.notifyMinFit || j.ai_scam === 'high'));
+        await markNotified(rejected.map((j) => j.id));
         pending = pending
-          .filter((j) => j.ai_score != null && j.ai_score >= config.ai.notifyMinFit && j.ai_scam !== 'high')
+          .filter((j) => j.ai_score != null && !rejected.includes(j))
           .sort((a, b) => b.ai_score - a.ai_score);
       }
-      const batch = pending.slice(0, config.telegram.maxPerRun);
+      const batch = pending.slice(0, tg.maxPerRun);
+      let failed = false;
       for (const job of batch) {
         try {
           await sendTelegram(formatJob(job, appUrl(config)));
@@ -108,18 +119,24 @@ async function scan({ force }) {
           sent++;
           await new Promise((r) => setTimeout(r, 1100)); // Telegram: ~1 msg/s per chat
         } catch (err) {
+          // Only what was actually sent is marked: the rest is tried again next scan.
           console.error(`[telegram] ${err.message}`);
+          failed = true;
           break;
         }
       }
-      if (pending.length > batch.length) {
-        await sendTelegram(`…và còn <b>${pending.length - batch.length}</b> job phù hợp khác. Xem tại ${appUrl(config)}`).catch(() => {});
+      const rest = pending.slice(batch.length);
+      if (!failed && rest.length) {
+        try {
+          await sendTelegram(`…và còn <b>${rest.length}</b> job phù hợp khác. Xem tại ${appUrl(config)}`);
+          await markNotified(rest.map((j) => j.id));
+        } catch (err) {
+          console.error(`[telegram] ${err.message}`);
+        }
       }
-      await markNotified(pending.slice(batch.length).map((j) => j.id));
+    } else {
+      await silenceAll();
     }
-    // Jobs the AI filter dropped stay silent; silenceOlderThan only covers older runs.
-    if (telegramConfigured()) await markNotified((await pendingNotifications({ minScore: -999, maxAgeHours: 1e6, sinceIso: startedAt })).map((j) => j.id));
-    await silenceOlderThan(startedAt);
     const deleted = await deleteStaleJobs(config.retentionDays ?? 60);
     if (deleted) console.log(`Deleted ${deleted} jobs no source has listed for ${config.retentionDays ?? 60} days`);
     await setMeta('lastRun', { at: startedAt, newCount, sent });

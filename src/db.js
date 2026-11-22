@@ -78,7 +78,9 @@ export async function aiCandidates({ minScore, limit }) {
   const { rows } = await q(`
     SELECT * FROM jobs
     WHERE ai_checked_at IS NULL AND status IN ('new', 'saved') AND region_ok AND score >= $1
-    ORDER BY score DESC, COALESCE(posted_at, first_seen) DESC LIMIT $2
+    -- Jobs still waiting for a Telegram decision come first, so a new job is
+    -- never pushed out by the backlog of older ones nobody has read yet.
+    ORDER BY (NOT notified) DESC, score DESC, COALESCE(posted_at, first_seen) DESC LIMIT $2
   `, [minScore, limit]);
   return rows.map(rowToJob);
 }
@@ -159,24 +161,35 @@ export async function counts() {
   return Object.fromEntries(rows.map((r) => [r.status, r.n]));
 }
 
-export async function pendingNotifications({ minScore, maxAgeHours, sinceIso }) {
+/** Jobs that may still go to Telegram: not sent or settled yet, open to Vietnam, good enough, recent. */
+export async function pendingNotifications({ minScore, maxAgeHours }) {
   const cutoff = new Date(Date.now() - maxAgeHours * 3.6e6).toISOString();
   const { rows } = await q(`
     SELECT * FROM jobs
     WHERE NOT notified AND status = 'new' AND region_ok AND score >= $1
-      AND first_seen >= $2 AND COALESCE(posted_at, first_seen) >= $3
+      AND COALESCE(posted_at, first_seen) >= $2
     ORDER BY score DESC
-  `, [minScore, sinceIso, cutoff]);
+  `, [minScore, cutoff]);
   return rows.map(rowToJob);
 }
 
+/** "notified" means settled: sent, or decided not to send. */
 export async function markNotified(ids) {
   if (ids.length) await q('UPDATE jobs SET notified = TRUE WHERE id = ANY($1)', [ids]);
 }
 
-/** Everything first seen before `sinceIso` that never got sent stays silent. */
-export async function silenceOlderThan(sinceIso) {
-  await q('UPDATE jobs SET notified = TRUE WHERE NOT notified AND first_seen < $1', [sinceIso]);
+/** Settles every job that can no longer go to Telegram: too old, low score, not open to Vietnam, or moved out of "new". */
+export async function silenceIneligible({ minScore, maxAgeHours }) {
+  const cutoff = new Date(Date.now() - maxAgeHours * 3.6e6).toISOString();
+  await q(`
+    UPDATE jobs SET notified = TRUE
+    WHERE NOT notified AND NOT (status = 'new' AND region_ok AND score >= $1 AND COALESCE(posted_at, first_seen) >= $2)
+  `, [minScore, cutoff]);
+}
+
+/** With Telegram off nothing waits: turning it on later does not send a backlog. */
+export async function silenceAll() {
+  await q('UPDATE jobs SET notified = TRUE WHERE NOT notified');
 }
 
 /**

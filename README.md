@@ -28,7 +28,7 @@ Chỉ quét một lần, không mở web: `npm run fetch`
 4. Chạy `npm run telegram:chatid`, rồi copy dòng `TELEGRAM_CHAT_ID=...` vào `.env`.
 5. Khởi động lại `npm start`.
 
-Mỗi lần quét, bot gửi tối đa 10 job mới có điểm ≥ 25, đăng trong 48 giờ gần nhất và nhận người ở Việt Nam. Bạn chỉnh các ngưỡng này trong mục `telegram` của `config.json`.
+Mỗi lần quét, bot gửi tối đa 10 job có điểm ≥ 25, đăng trong 48 giờ gần nhất và nhận người ở Việt Nam, kèm một tin "…và còn N job" nếu còn dư. Mỗi job chỉ được gửi một lần. Nếu Telegram lỗi giữa chừng, job chưa gửi được sẽ thử lại ở lượt quét sau (miễn là chưa quá 48 giờ). Bạn chỉnh các ngưỡng này trong mục `telegram` của `config.json`.
 
 `.env` chứa token: đừng commit hay gửi file này cho ai.
 
@@ -40,7 +40,7 @@ Mỗi lần quét, bot gửi tối đa 10 job mới có điểm ≥ 25, đăng t
 4. Khởi động lại `npm start`.
 
 AI làm gì:
-- **Chấm điểm**: sau mỗi lần quét, tối đa 30 job có điểm từ khoá cao nhất được Gemini đọc (10 job/lần gọi) và chấm 0–100, kèm lý do và cảnh báo lừa đảo. Telegram khi đó chỉ gửi job AI chấm ≥ 60 và không bị nghi lừa đảo.
+- **Chấm điểm**: sau mỗi lần quét, tối đa 30 job được Gemini đọc (10 job/lần gọi) và chấm 0–100, kèm lý do và cảnh báo lừa đảo. Job đang chờ báo Telegram được đọc trước, sau đó mới tới các job cũ có điểm từ khoá cao nhất. Telegram khi đó chỉ gửi job AI chấm ≥ 60 và không bị nghi lừa đảo; job AI chưa kịp đọc thì chờ lượt sau.
 - **10 điểm chính**: khi bạn cuộn tới job nào, AI tóm tắt mô tả dài thành tối đa 10 gạch đầu dòng tiếng Việt, hiện ngay phía trên mô tả gốc (mô tả gốc vẫn giữ). Chỉ các job đang hiện trên màn hình mới được tóm tắt, tối đa 10 job/lần gọi; lướt nhanh qua thì không tốn lượt. Kết quả được lưu, lần sau hiện ngay.
 - **✍️ AI chuẩn bị apply** (nút trên mỗi job): viết proposal/cover letter, giá bid + thời gian giao, milestones, câu trả lời cho các câu hỏi thường gặp trong form, câu nên hỏi lại khách, điểm mạnh để đưa vào CV, và danh sách những gì bạn phải tự điền. Mỗi mục có nút Copy. Kết quả được lưu lại; bấm **Viết lại** để có bản khác.
 
