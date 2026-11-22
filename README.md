@@ -30,6 +30,10 @@ Chỉ quét một lần, không mở web: `npm run fetch`
 
 Mỗi lần quét, bot gửi tối đa 10 job có điểm ≥ 25, đăng trong 48 giờ gần nhất và nhận người ở Việt Nam, kèm một tin "…và còn N job" nếu còn dư. Mỗi job chỉ được gửi một lần. Nếu Telegram lỗi giữa chừng, job chưa gửi được sẽ thử lại ở lượt quét sau (miễn là chưa quá 48 giờ). Bạn chỉnh các ngưỡng này trong mục `telegram` của `config.json`.
 
+**Kiểm tra kết nối:** bấm **📨 Gửi tin thử** trên trang. Bot gửi một tin xác nhận kèm job tốt nhất hiện có. Nếu cấu hình sai, trang báo rõ lỗi (token sai, chat id sai, bạn đã chặn bot…).
+
+**Bot trả lời `/start`** khi JobRadar chạy online (`PUBLIC_URL` bắt đầu bằng `https://`): lúc khởi động, server tự đăng ký webhook với Telegram. Nhắn `/start` từ chat đã cấu hình, bot xác nhận đã kết nối; từ chat khác, bot trả lời chat id của chat đó. Khi đã có webhook, `npm run telegram:chatid` không đọc được tin nhắn nữa: thay vào đó, nhắn `/start` để lấy chat id. Chạy trên máy (không có https) thì bot không trả lời, nhưng vẫn gửi job bình thường.
+
 `.env` chứa token: đừng commit hay gửi file này cho ai.
 
 ## Bật AI (Gemini, miễn phí)

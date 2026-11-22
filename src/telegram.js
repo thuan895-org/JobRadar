@@ -1,22 +1,84 @@
+import { createHash } from 'node:crypto';
+
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function telegramConfigured() {
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
 }
 
-export async function sendTelegram(html) {
+export async function sendTelegram(html, chatId = process.env.TELEGRAM_CHAT_ID) {
+  return callTelegram('sendMessage', { chat_id: chatId, text: html, parse_mode: 'HTML', disable_web_page_preview: true });
+}
+
+async function callTelegram(method, payload) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text: html, parse_mode: 'HTML', disable_web_page_preview: true }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(20000),
   });
-  if (!res.ok) {
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body.ok === false) {
     // Never echo the URL: it contains the bot token.
-    const body = await res.json().catch(() => ({}));
-    throw new Error(`Telegram refused the message (HTTP ${res.status}: ${body.description ?? 'unknown error'})`);
+    const err = new Error(`Telegram refused ${method} (HTTP ${res.status}: ${body.description ?? 'unknown error'})`);
+    err.status = res.status;
+    err.description = body.description ?? '';
+    throw err;
   }
+  return body.result;
+}
+
+/** Turns a Telegram error into what to fix, in Vietnamese, for the page. */
+export function explainTelegramError(err) {
+  const d = err.description ?? '';
+  if (err.status === 401 || err.status === 404) return 'Token bot sai (TELEGRAM_BOT_TOKEN). Lấy lại token ở @BotFather.';
+  if (/chat not found/i.test(d)) return 'Không tìm thấy chat: TELEGRAM_CHAT_ID sai. Nhắn /start cho bot, bot sẽ trả lời chat id đúng.';
+  if (/blocked by the user/i.test(d)) return 'Bạn đã chặn bot. Mở bot trong Telegram, bấm Restart (hoặc Start) rồi thử lại.';
+  if (/can't initiate/i.test(d)) return 'Bot chưa được phép nhắn cho bạn. Mở bot trong Telegram và nhắn /start trước.';
+  if (err.status === 429) return 'Telegram đang giới hạn tốc độ gửi. Thử lại sau ít phút.';
+  return err.message;
+}
+
+// ---- Replies to /start (Telegram calls our webhook) ----
+
+/** Telegram sends this back in a header on every webhook call; derived from the token, so no extra setting. */
+export function webhookSecret() {
+  return createHash('sha256').update(`jobradar-telegram-webhook:${process.env.TELEGRAM_BOT_TOKEN ?? ''}`).digest('hex');
+}
+
+/** Points the bot at /api/telegram/webhook. Telegram only accepts https, so local runs skip it. */
+export async function setupWebhook(appUrl) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return 'off (no TELEGRAM_BOT_TOKEN)';
+  if (!/^https:\/\//.test(appUrl)) return 'off (needs PUBLIC_URL starting with https://)';
+  try {
+    await callTelegram('setWebhook', { url: `${appUrl}/api/telegram/webhook`, secret_token: webhookSecret(), allowed_updates: ['message'] });
+    return 'on (webhook)';
+  } catch (err) {
+    return `failed: ${err.message}`;
+  }
+}
+
+/** Answers a message sent to the bot. The bot only sends job alerts, so this just confirms the connection. */
+export async function handleUpdate(update, appUrl) {
+  const msg = update?.message;
+  if (!msg?.chat || typeof msg.text !== 'string') return;
+  const chatId = String(msg.chat.id);
+  const command = msg.text.trim().split(/\s+/)[0].split('@')[0].toLowerCase();
+  const isOwner = chatId === String(process.env.TELEGRAM_CHAT_ID ?? '');
+  if (['/start', '/id', '/help'].includes(command)) {
+    const text = isOwner
+      ? ['👋 <b>JobRadar đã kết nối với chat này.</b>',
+          'Sau mỗi lượt quét, bot sẽ gửi vào đây những job mới phù hợp với bạn. Không có job mới phù hợp thì bot im lặng.',
+          `Xem tất cả job: ${esc(appUrl)}`].join('\n\n')
+      : ['👋 Chào bạn!',
+          `Chat id của bạn là: <code>${esc(chatId)}</code>`,
+          `Để nhận job ở chat này, đặt <code>TELEGRAM_CHAT_ID=${esc(chatId)}</code> trong file .env (hoặc phần Environment trên Render) rồi khởi động lại JobRadar.`].join('\n\n');
+    await sendTelegram(text, chatId);
+  } else if (isOwner) {
+    await sendTelegram('Bot này chỉ gửi thông báo job. Gõ /start để kiểm tra kết nối.', chatId);
+  }
+  // Anyone else who writes to the bot gets no answer except to /start.
 }
 
 export function formatJob(job, appUrl) {

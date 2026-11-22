@@ -12,6 +12,11 @@ if (!token) {
 }
 const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
 const data = await res.json();
+if (!data.ok && res.status === 409) {
+  console.error('This bot has a webhook (JobRadar is running online), so this script cannot read its messages.');
+  console.error('Send /start to the bot instead: it replies with your chat id.');
+  process.exit(1);
+}
 if (!data.ok) {
   console.error(`Telegram error: ${data.description}`);
   process.exit(1);

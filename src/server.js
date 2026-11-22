@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { ROOT, loadConfig, loadEnv } from './util.js';
 import { initDb, listJobs, setStatus, counts, getMeta, getJob, saveApplyKit, saveHighlights } from './db.js';
-import { runOnce, aiScoreOne, scanRunning } from './run.js';
-import { telegramConfigured } from './telegram.js';
+import { runOnce, aiScoreOne, scanRunning, appUrl } from './run.js';
+import { telegramConfigured, sendTelegram, formatJob, explainTelegramError, webhookSecret, setupWebhook, handleUpdate } from './telegram.js';
 import { aiConfigured, applyKit, summarizeJobs } from './ai.js';
 
 loadEnv();
@@ -147,6 +147,20 @@ const server = createServer(async (req, res) => {
       return send(res, 202, { started: !already, alreadyRunning: already });
     }
 
+    // Telegram calls this when someone writes to the bot. The secret header proves it is Telegram.
+    if (req.method === 'POST' && url.pathname === '/api/telegram/webhook') {
+      if (!process.env.TELEGRAM_BOT_TOKEN || !sameText(req.headers['x-telegram-bot-api-secret-token'] ?? '', webhookSecret())) {
+        return send(res, 401, { error: 'bad webhook secret' });
+      }
+      try {
+        await handleUpdate(JSON.parse(await readRaw(req)), appUrl(config));
+      } catch (err) {
+        console.error(`[telegram] reply failed: ${err.message}`);
+      }
+      // Always 200: otherwise Telegram keeps resending the same message.
+      return send(res, 200, { ok: true });
+    }
+
     if (url.pathname === '/login') {
       if (req.method === 'GET') return send(res, 200, loginPage(), 'text/html; charset=utf-8');
       if (req.method === 'POST') {
@@ -226,6 +240,23 @@ const server = createServer(async (req, res) => {
       // At most 10 per request: only what is on screen.
       return send(res, 200, await highlightsFor([...new Set(ids.map(String))].slice(0, 10)));
     }
+    if (req.method === 'POST' && url.pathname === '/api/telegram/test') {
+      if (!telegramConfigured()) {
+        const missing = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'].filter((k) => !process.env[k]).join(' và ');
+        return send(res, 400, { error: `Telegram chưa cấu hình: thiếu ${missing}.` });
+      }
+      const [best] = await listJobs({ status: 'new', regionOnly: true, sort: 'ai', limit: 1 });
+      try {
+        await sendTelegram(['✅ <b>JobRadar đã kết nối</b>',
+          'Đây là tin thử. Sau mỗi lượt quét, job mới phù hợp sẽ được gửi vào chat này.',
+          best ? 'Job tốt nhất hiện có:' : 'Hiện chưa có job nào để gửi kèm.'].join('\n\n'));
+        if (best) await sendTelegram(formatJob(best, appUrl(config)));
+        return send(res, 200, { ok: true, job: best?.title ?? null });
+      } catch (err) {
+        console.error(`[telegram] test failed: ${err.message}`);
+        return send(res, 502, { error: explainTelegramError(err) });
+      }
+    }
     if (req.method === 'POST' && url.pathname === '/api/refresh') {
       // Waits for the scan already running, if there is one, instead of starting a second.
       return send(res, 200, await runOnce({ force: true }));
@@ -243,6 +274,7 @@ server.listen(PORT, HOST, () => {
   console.log(`Login: ${PASSWORD ? 'on' : 'off (set APP_PASSWORD to turn it on)'}`);
   console.log(`Cron endpoint: ${CRON_SECRET ? 'on (/api/cron/scan)' : 'off (set CRON_SECRET to turn it on)'}`);
   console.log(`Telegram: ${telegramConfigured() ? 'on' : 'off (fill in .env to turn it on)'}`);
+  setupWebhook(appUrl(config)).then((state) => console.log(`Telegram /start replies: ${state}`));
   console.log(`Gemini AI: ${aiConfigured() ? 'on' : 'off (add GEMINI_API_KEY to .env to turn it on)'}`);
 });
 

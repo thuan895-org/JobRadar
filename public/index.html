@@ -65,6 +65,8 @@
   .setup b { color: var(--warn); }
   .setup ol { margin: 6px 0 0; padding-left: 20px; }
   .setup code { background: var(--card); padding: 1px 5px; border-radius: 4px; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 5; width: max-content; max-width: min(520px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 16px; border-radius: 10px; background: var(--good-soft); color: var(--good); border: 1px solid var(--good); font-size: 14px; box-shadow: 0 4px 16px #0002; }
+  .toast.err { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
   .hl { margin-top: 10px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 0 8px 8px 0; padding: 8px 12px; }
   .hl-title { font-size: 12px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
   .hl ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 18px; }
@@ -102,6 +104,7 @@
     <div class="top">
       <h1>📡 JobRadar</h1>
       <div class="status-line" id="statusLine">Đang tải…</div>
+      <button id="tgTest" title="Bot gửi một tin thử vào Telegram của bạn">📨 Gửi tin thử</button>
       <button class="primary" id="refresh">Quét ngay</button>
       <a id="logout" href="/logout" hidden>Đăng xuất</a>
     </div>
@@ -206,7 +209,7 @@ function renderJob(job) {
   const chips = el('div', 'chips');
   job.matched.forEach((m) => chips.append(el('span', 'chip', m)));
   if (job.ai_scam === 'high' || job.ai_scam === 'medium') chips.append(el('span', 'chip scam', job.ai_scam === 'high' ? '⚠️ Nghi lừa đảo' : '⚠️ Cần cẩn thận'));
-  const desc = el('div', 'desc clamp', job.description.slice(0, 2500));
+  const desc = el('div', 'desc clamp', (job.description || '').slice(0, 2500));
   desc.title = 'Bấm để xem thêm';
   desc.onclick = () => desc.classList.toggle('clamp');
   const actions = el('div', 'actions');
@@ -437,6 +440,27 @@ async function load(full = true) {
   list.replaceChildren(...(data.jobs.length ? data.jobs.map(renderJob) : [el('div', 'empty', 'Chưa có job nào khớp bộ lọc. Thử hạ "Điểm ≥" hoặc bỏ tick "Chỉ job nhận người ở VN".')]));
 }
 
+let toastTimer;
+function toast(text, isError = false) {
+  let t = $('toast');
+  if (!t) { t = el('div', 'toast'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); }
+  t.className = isError ? 'toast err' : 'toast';
+  t.textContent = text;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, isError ? 12000 : 6000);
+}
+$('tgTest').onclick = async () => {
+  const b = $('tgTest'); b.disabled = true; b.textContent = 'Đang gửi…';
+  try {
+    const r = await fetch('/api/telegram/test', { method: 'POST' });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) toast(data.job ? `Đã gửi tin thử kèm job “${data.job}”. Mở Telegram để xem.` : 'Đã gửi tin thử. Mở Telegram để xem.');
+    else toast(data.error || `Gửi thất bại (HTTP ${r.status}).`, true);
+  } catch {
+    toast('Không gọi được server.', true);
+  } finally { b.disabled = false; b.textContent = '📨 Gửi tin thử'; }
+};
 $('refresh').onclick = async () => {
   const b = $('refresh'); b.disabled = true; b.textContent = 'Đang quét…';
   try { await fetch('/api/refresh', { method: 'POST' }); } finally { b.disabled = false; b.textContent = 'Quét ngay'; load(); }
