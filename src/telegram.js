@@ -40,6 +40,26 @@ export function explainTelegramError(err) {
   return err.message;
 }
 
+/**
+ * The list sent after quiet hours: every held job on one line or two, best
+ * first. Stays well under Telegram's 4096-character limit; the rest is counted.
+ */
+export function formatDigest(jobs, appUrl, max = 20) {
+  const lines = [`☀️ <b>Bản tin đầu ngày: ${jobs.length} job phù hợp</b> tìm được trong giờ nghỉ`, ''];
+  let shown = 0;
+  for (const job of jobs.slice(0, max)) {
+    const facts = [esc(job.source), job.budget_text && `💰 ${esc(job.budget_text)}`, job.ai_score != null ? `🤖 ${job.ai_score}` : `⭐ ${job.score}`].filter(Boolean).join(' · ');
+    const reason = job.ai_reason ? `\n💡 ${esc(job.ai_reason.length > 100 ? `${job.ai_reason.slice(0, 99)}…` : job.ai_reason)}` : '';
+    const entry = `${shown + 1}. <a href="${esc(job.url)}">${esc(job.title)}</a>\n${facts}${reason}\n`;
+    if (lines.join('\n').length + entry.length > 3500) break;
+    lines.push(entry);
+    shown++;
+  }
+  if (jobs.length > shown) lines.push(`…và còn <b>${jobs.length - shown}</b> job khác.`);
+  lines.push(`Xem tất cả: ${esc(appUrl)}`);
+  return lines.join('\n');
+}
+
 // ---- Replies to /start (Telegram calls our webhook) ----
 
 /** Telegram sends this back in a header on every webhook call; derived from the token, so no extra setting. */

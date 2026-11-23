@@ -30,7 +30,9 @@ Chỉ quét một lần, không mở web: `npm run fetch`
 
 Mỗi lần quét, bot gửi tối đa 10 job có điểm ≥ 25, đăng trong 48 giờ gần nhất và nhận người ở Việt Nam, kèm một tin "…và còn N job" nếu còn dư. Mỗi job chỉ được gửi một lần. Nếu Telegram lỗi giữa chừng, job chưa gửi được sẽ thử lại ở lượt quét sau (miễn là chưa quá 48 giờ). Bạn chỉnh các ngưỡng này trong mục `telegram` của `config.json`.
 
-**Kiểm tra kết nối:** bấm **📨 Gửi tin thử** trên trang. Bot gửi một tin xác nhận kèm job tốt nhất hiện có. Nếu cấu hình sai, trang báo rõ lỗi (token sai, chat id sai, bạn đã chặn bot…).
+**Giờ nghỉ:** bấm **⚙️ Telegram** trên trang. Mặc định bot không gửi tin từ 00:00 đến 06:00 (giờ Việt Nam). Job phù hợp tìm được trong giờ nghỉ được giữ lại và gửi thành **một danh sách** ở lượt quét đầu tiên sau giờ nghỉ (với cron mỗi 60 phút: trong khoảng 06:00–07:00). Danh sách hiện tối đa 20 job, còn lại thì ghi số lượng. Bạn đổi giờ hoặc tắt giờ nghỉ ngay trong hộp đó; cài đặt được lưu trong database và tính theo múi giờ của trình duyệt lúc bạn bấm Lưu.
+
+**Kiểm tra kết nối:** bấm **⚙️ Telegram → 📨 Gửi tin thử** trên trang. Bot gửi một tin xác nhận kèm job tốt nhất hiện có. Nếu cấu hình sai, trang báo rõ lỗi (token sai, chat id sai, bạn đã chặn bot…).
 
 **Bot trả lời `/start`** khi JobRadar chạy online (`PUBLIC_URL` bắt đầu bằng `https://`): lúc khởi động, server tự đăng ký webhook với Telegram. Nhắn `/start` từ chat đã cấu hình, bot xác nhận đã kết nối; từ chat khác, bot trả lời chat id của chat đó. Khi đã có webhook, `npm run telegram:chatid` không đọc được tin nhắn nữa: thay vào đó, nhắn `/start` để lấy chat id. Chạy trên máy (không có https) thì bot không trả lời, nhưng vẫn gửi job bình thường.
 
@@ -127,6 +129,7 @@ Sau mỗi lượt quét, job ở tab Mới / Đã ẩn mà không nguồn nào c
 ```
 src/sources.js   lấy job từ từng nguồn, chuẩn hoá về một dạng
 src/score.js     chấm điểm theo config.json
+src/settings.js  cài đặt đổi từ trang web (giờ nghỉ Telegram), lưu trong database
 src/db.js        lưu vào Postgres (Neon), kể cả kết quả AI theo id job
 src/run.js       một lượt quét + gửi Telegram
 src/server.js    trang web, đăng nhập, endpoint cho cron + lịch quét khi server thức

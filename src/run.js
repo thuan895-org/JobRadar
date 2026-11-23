@@ -3,7 +3,8 @@ import { loadConfig, loadEnv } from './util.js';
 import { SOURCES } from './sources.js';
 import { scoreJob } from './score.js';
 import { initDb, pool, upsertJob, getMeta, setMeta, pendingNotifications, markNotified, silenceIneligible, silenceAll, aiCandidates, saveAiScore, getJob, deleteStaleJobs } from './db.js';
-import { telegramConfigured, sendTelegram, formatJob } from './telegram.js';
+import { telegramConfigured, sendTelegram, formatJob, formatDigest } from './telegram.js';
+import { getTelegramSettings, inQuietHours } from './settings.js';
 import { aiConfigured, scoreJobs } from './ai.js';
 
 // The scan in progress, if any: a second request waits for it instead of starting another.
@@ -44,6 +45,23 @@ export async function aiScoreOne(id) {
   const [r] = await scoreJobs([job]);
   if (r) await saveAiScore(id, r);
   return getJob(id);
+}
+
+/**
+ * Jobs ready to go to Telegram. With AI on, Gemini has the final say: a job it
+ * rated low (or as a likely scam) is `rejected`; one it has not read yet is in
+ * neither list and waits for a later scan. With AI off (or failing this time),
+ * the keyword score decides.
+ */
+export async function telegramQueue(config, { aiOk = aiConfigured() } = {}) {
+  const tg = config.telegram;
+  const pending = await pendingNotifications({ minScore: tg.minScore, maxAgeHours: tg.maxAgeHours });
+  if (!aiOk) return { sendable: pending, rejected: [] };
+  const rejected = pending.filter((j) => j.ai_score != null && (j.ai_score < config.ai.notifyMinFit || j.ai_scam === 'high'));
+  const sendable = pending
+    .filter((j) => j.ai_score != null && !rejected.includes(j))
+    .sort((a, b) => b.ai_score - a.ai_score);
+  return { sendable, rejected };
 }
 
 /** Fetches every source that is due, saves and scores jobs, then notifies. */
@@ -99,40 +117,31 @@ async function scan({ force }) {
 
     let sent = 0;
     if (telegramConfigured()) {
-      let pending = await pendingNotifications({ minScore: tg.minScore, maxAgeHours: tg.maxAgeHours });
-      // With AI on, Gemini has the final say. A job it rated low (or as a likely
-      // scam) is settled; one it has not read yet waits for the next scan.
-      // If Gemini failed this time, the keyword score decides, as without AI.
-      if (aiConfigured() && !ai.error) {
-        const rejected = pending.filter((j) => j.ai_score != null && (j.ai_score < config.ai.notifyMinFit || j.ai_scam === 'high'));
-        await markNotified(rejected.map((j) => j.id));
-        pending = pending
-          .filter((j) => j.ai_score != null && !rejected.includes(j))
-          .sort((a, b) => b.ai_score - a.ai_score);
-      }
-      const batch = pending.slice(0, tg.maxPerRun);
-      let failed = false;
-      for (const job of batch) {
-        try {
-          await sendTelegram(formatJob(job, appUrl(config)));
-          await markNotified([job.id]);
-          sent++;
-          await new Promise((r) => setTimeout(r, 1100)); // Telegram: ~1 msg/s per chat
-        } catch (err) {
-          // Only what was actually sent is marked: the rest is tried again next scan.
-          console.error(`[telegram] ${err.message}`);
-          failed = true;
-          break;
+      const { sendable, rejected } = await telegramQueue(config, { aiOk: aiConfigured() && !ai.error });
+      await markNotified(rejected.map((j) => j.id));
+      const settings = await getTelegramSettings();
+      if (inQuietHours(settings)) {
+        // Quiet hours: send nothing, keep the jobs pending for the morning list.
+        if (sendable.length) {
+          await setMeta('telegramHeld', true);
+          console.log(`[telegram] quiet hours (${settings.quietStart}–${settings.quietEnd}): holding ${sendable.length} jobs for the morning list`);
         }
-      }
-      const rest = pending.slice(batch.length);
-      if (!failed && rest.length) {
-        try {
-          await sendTelegram(`…và còn <b>${rest.length}</b> job phù hợp khác. Xem tại ${appUrl(config)}`);
-          await markNotified(rest.map((j) => j.id));
-        } catch (err) {
-          console.error(`[telegram] ${err.message}`);
+      } else if (await getMeta('telegramHeld')) {
+        // First scan after quiet hours: everything held (and anything new) goes out as one list.
+        if (sendable.length) {
+          try {
+            await sendTelegram(formatDigest(sendable, appUrl(config)));
+            await markNotified(sendable.map((j) => j.id));
+            sent = sendable.length;
+            await setMeta('telegramHeld', false);
+          } catch (err) {
+            console.error(`[telegram] morning list not sent, will retry next scan: ${err.message}`);
+          }
+        } else {
+          await setMeta('telegramHeld', false); // what was held got hidden, or is too old now
         }
+      } else {
+        sent = await sendOneByOne(sendable, config);
       }
     } else {
       await silenceAll();
@@ -143,6 +152,34 @@ async function scan({ force }) {
     console.log(`Done: ${newCount} new jobs, ${sent} sent to Telegram${telegramConfigured() ? '' : ' (Telegram not configured)'}`);
     return { newCount, sent };
   }
+}
+
+/** One message per job, at most telegram.maxPerRun, then a line saying how many more there are. */
+async function sendOneByOne(jobs, config) {
+  const batch = jobs.slice(0, config.telegram.maxPerRun);
+  let sent = 0;
+  for (const job of batch) {
+    try {
+      await sendTelegram(formatJob(job, appUrl(config)));
+      await markNotified([job.id]);
+      sent++;
+      await new Promise((r) => setTimeout(r, 1100)); // Telegram: ~1 msg/s per chat
+    } catch (err) {
+      // Only what was actually sent is marked: the rest is tried again next scan.
+      console.error(`[telegram] ${err.message}`);
+      return sent;
+    }
+  }
+  const rest = jobs.slice(batch.length);
+  if (rest.length) {
+    try {
+      await sendTelegram(`…và còn <b>${rest.length}</b> job phù hợp khác. Xem tại ${appUrl(config)}`);
+      await markNotified(rest.map((j) => j.id));
+    } catch (err) {
+      console.error(`[telegram] ${err.message}`);
+    }
+  }
+  return sent;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

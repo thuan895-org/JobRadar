@@ -84,6 +84,13 @@
   .dlg-head { position: sticky; top: 0; background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 18px; display: flex; gap: 10px; align-items: flex-start; }
   .dlg-head h2 { font-size: 17px; margin: 0; flex: 1; }
   .dlg-body { padding: 6px 18px 20px; }
+  #tgDialog { width: min(460px, calc(100vw - 32px)); }
+  #tgDialog h3 { font-size: 15px; margin: 18px 0 8px; }
+  .tg-state { margin: 10px 0 0; font-size: 14px; }
+  .tg-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0; }
+  .tg-row input[type=time] { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  .tg-hint { color: var(--muted); font-size: 13px; margin: 8px 0; }
+  .tg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
   .kit-sec { margin-top: 16px; }
   .kit-sec h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
   .kit-sec h3 button { font-size: 12px; padding: 2px 8px; text-transform: none; letter-spacing: 0; }
@@ -104,7 +111,7 @@
     <div class="top">
       <h1>📡 JobRadar</h1>
       <div class="status-line" id="statusLine">Đang tải…</div>
-      <button id="tgTest" title="Bot gửi một tin thử vào Telegram của bạn">📨 Gửi tin thử</button>
+      <button id="tgOpen" title="Giờ nghỉ và gửi tin thử">⚙️ Telegram</button>
       <button class="primary" id="refresh">Quét ngay</button>
       <a id="logout" href="/logout" hidden>Đăng xuất</a>
     </div>
@@ -118,6 +125,27 @@
     </div>
   </div>
 </header>
+<dialog id="tgDialog">
+  <div class="dlg-head">
+    <h2>Telegram</h2>
+    <button id="tgClose">Đóng</button>
+  </div>
+  <div class="dlg-body">
+    <p class="tg-state" id="tgState"></p>
+    <h3>Giờ nghỉ</h3>
+    <label class="tg-row"><input type="checkbox" id="quietOn"> Không gửi tin trong giờ nghỉ</label>
+    <div class="tg-row" id="quietTimes">
+      <label>Từ <input type="time" id="quietStart" required></label>
+      <label>đến <input type="time" id="quietEnd" required></label>
+    </div>
+    <p class="tg-hint">Job phù hợp tìm được trong giờ nghỉ được giữ lại, rồi gửi thành <b>một danh sách</b> ở lượt quét đầu tiên sau giờ nghỉ.</p>
+    <p class="tg-hint" id="quietNow"></p>
+    <div class="tg-actions">
+      <button class="primary" id="tgSave">Lưu</button>
+      <button id="tgTest" title="Bot gửi một tin thử vào Telegram của bạn">📨 Gửi tin thử</button>
+    </div>
+  </div>
+</dialog>
 <dialog id="kitDialog">
   <div class="dlg-head">
     <h2 id="kitTitle"></h2>
@@ -422,6 +450,7 @@ async function load(full = true) {
   const p = new URLSearchParams({ status: state.status, minScore: $('minScore').value, source: $('source').value, q: $('q').value.trim(), regionOnly: $('regionOnly').checked ? '1' : '0', sort: $('sort').value });
   const data = await (await fetch('/api/jobs?' + p)).json();
   aiOn = data.ai;
+  lastData = data;
   $('aiSetup').hidden = aiOn;
   renderTabs(data.counts);
   renderSources(data.sources);
@@ -432,7 +461,7 @@ async function load(full = true) {
   const last = data.lastRun ? `Lần quét cuối ${ago(data.lastRun.at)} · ${data.lastRun.newCount} job mới` : 'Chưa quét lần nào';
   const aiText = !data.ai ? 'AI chưa cấu hình' : data.aiStatus && !data.aiStatus.ok ? `AI lỗi: ${data.aiStatus.error}` : 'AI Gemini đang bật';
   $('logout').hidden = !data.loginEnabled;
-  $('statusLine').textContent = `${last}${data.scanning ? ' · đang quét…' : ''} · tự quét mỗi ${data.intervalMinutes} phút · Telegram ${data.telegram ? 'đang bật' : 'chưa cấu hình'} · ${aiText}`;
+  $('statusLine').textContent = `${last}${data.scanning ? ' · đang quét…' : ''} · tự quét mỗi ${data.intervalMinutes} phút · Telegram ${!data.telegram ? 'chưa cấu hình' : data.telegramSettings?.quietEnabled ? `đang bật, nghỉ ${data.telegramSettings.quietStart}–${data.telegramSettings.quietEnd}` : 'đang bật'} · ${aiText}`;
   if (!full) return;
   hlObserver.disconnect();
   visible.clear();
@@ -443,13 +472,54 @@ async function load(full = true) {
 let toastTimer;
 function toast(text, isError = false) {
   let t = $('toast');
-  if (!t) { t = el('div', 'toast'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.append(t); }
+  if (!t) { t = el('div', 'toast'); t.id = 'toast'; t.setAttribute('role', 'status'); }
+  // An open modal dialog sits above the page: the toast has to live inside it to be seen.
+  (document.querySelector('dialog[open]') || document.body).append(t);
   t.className = isError ? 'toast err' : 'toast';
   t.textContent = text;
   t.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, isError ? 12000 : 6000);
 }
+let lastData = null;
+const browserTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
+function syncQuiet() {
+  const on = $('quietOn').checked;
+  $('quietStart').disabled = !on; $('quietEnd').disabled = !on;
+}
+function showTg(data) {
+  const s = data.settings;
+  $('quietOn').checked = s.quietEnabled;
+  $('quietStart').value = s.quietStart;
+  $('quietEnd').value = s.quietEnd;
+  syncQuiet();
+  const state = !s.quietEnabled ? 'đang gửi bình thường (giờ nghỉ đang tắt).'
+    : data.quietNow ? `đang trong giờ nghỉ${data.held ? `, đang giữ ${data.held} job cho bản tin đầu ngày` : ', chưa có job nào được giữ'}.`
+    : 'đang gửi bình thường.';
+  $('quietNow').textContent = `Bây giờ là ${data.localNow} (${s.timezone}): ${state}`;
+}
+$('tgOpen').onclick = async () => {
+  $('tgState').textContent = lastData?.telegram ? '✅ Bot đang bật.' : '⚠️ Bot chưa cấu hình: thêm TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID vào .env (hoặc Environment trên Render).';
+  $('quietNow').textContent = 'Đang tải…';
+  $('tgDialog').showModal();
+  showTg(await (await fetch('/api/settings/telegram')).json());
+};
+$('tgClose').onclick = () => $('tgDialog').close();
+$('quietOn').onchange = syncQuiet;
+$('tgSave').onclick = async () => {
+  const b = $('tgSave'); b.disabled = true;
+  try {
+    const r = await fetch('/api/settings/telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quietEnabled: $('quietOn').checked, quietStart: $('quietStart').value, quietEnd: $('quietEnd').value, timezone: browserTz() }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) return toast(data.error || `Lưu thất bại (HTTP ${r.status}).`, true);
+    showTg(data);
+    toast(data.settings.quietEnabled ? `Đã lưu: không gửi tin từ ${data.settings.quietStart} đến ${data.settings.quietEnd}.` : 'Đã lưu: bot gửi tin cả ngày.');
+    load(false);
+  } catch {
+    toast('Không gọi được server.', true);
+  } finally { b.disabled = false; }
+};
 $('tgTest').onclick = async () => {
   const b = $('tgTest'); b.disabled = true; b.textContent = 'Đang gửi…';
   try {

@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { ROOT, loadConfig, loadEnv } from './util.js';
 import { initDb, listJobs, setStatus, counts, getMeta, getJob, saveApplyKit, saveHighlights } from './db.js';
-import { runOnce, aiScoreOne, scanRunning, appUrl } from './run.js';
+import { runOnce, aiScoreOne, scanRunning, appUrl, telegramQueue } from './run.js';
+import { getTelegramSettings, saveTelegramSettings, inQuietHours, localTime } from './settings.js';
 import { telegramConfigured, sendTelegram, formatJob, explainTelegramError, webhookSecret, setupWebhook, handleUpdate } from './telegram.js';
 import { aiConfigured, applyKit, summarizeJobs } from './ai.js';
 
@@ -205,7 +206,7 @@ const server = createServer(async (req, res) => {
       return send(res, 200, {
         jobs: jobs.map(({ apply_kit, ...j }) => ({ ...j, has_kit: Boolean(apply_kit) })),
         counts: await counts(), lastRun: await getMeta('lastRun'), sources: (await getMeta('sourceStatus')) ?? {},
-        telegram: telegramConfigured(), ai: aiConfigured(), aiStatus: await getMeta('aiStatus'),
+        telegram: telegramConfigured(), telegramSettings: await getTelegramSettings(), ai: aiConfigured(), aiStatus: await getMeta('aiStatus'),
         intervalMinutes: config.intervalMinutes, scanning: scanRunning(), loginEnabled: Boolean(PASSWORD),
       });
     }
@@ -239,6 +240,24 @@ const server = createServer(async (req, res) => {
       if (!Array.isArray(ids)) return send(res, 400, { error: 'ids must be a list' });
       // At most 10 per request: only what is on screen.
       return send(res, 200, await highlightsFor([...new Set(ids.map(String))].slice(0, 10)));
+    }
+    if (url.pathname === '/api/settings/telegram' && (req.method === 'GET' || req.method === 'POST')) {
+      let settings;
+      if (req.method === 'POST') {
+        try {
+          settings = await saveTelegramSettings(await readBody(req));
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
+      } else {
+        settings = await getTelegramSettings();
+      }
+      const quietNow = inQuietHours(settings);
+      return send(res, 200, {
+        settings, quietNow, localNow: localTime(new Date(), settings.timezone),
+        // How many jobs the morning list would hold right now.
+        held: quietNow && telegramConfigured() ? (await telegramQueue(config)).sendable.length : 0,
+      });
     }
     if (req.method === 'POST' && url.pathname === '/api/telegram/test') {
       if (!telegramConfigured()) {
