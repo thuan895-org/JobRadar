@@ -1,0 +1,25 @@
+# Builds both apps and runs every server test on each push and pull request.
+# Tests need no secrets or network: the database, Gemini, Telegram, Google and
+# Resend are all faked (see server/test/run.mjs).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type-check and build the user app and the admin app
+        run: npm run build
+      - name: Server tests
+        run: npm test

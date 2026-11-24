@@ -108,9 +108,36 @@ function cronAllowed(req, url) {
   return given !== '' && sameText(given, CRON_SECRET);
 }
 
+// Sent with every response. The app and admin (built by Vite, no inline
+// scripts) also get a strict Content-Security-Policy; Google's ad domains are
+// allowed there because Free users may see ads after consenting.
+const AD_HOSTS = 'https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.gstatic.com https://*.adtrafficquality.google';
+const APP_CSP = [
+  "default-src 'self'",
+  `script-src 'self' ${AD_HOSTS}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  `connect-src 'self' ${AD_HOSTS}`,
+  `frame-src ${AD_HOSTS}`,
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join('; ');
+
+function setSecurityHeaders(req, res, url) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  if (req.headers['x-forwarded-proto'] === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (/^\/(app|admin)(\/|$)/.test(url.pathname)) res.setHeader('Content-Security-Policy', APP_CSP);
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+    setSecurityHeaders(req, res, url);
 
     // Open to everyone: health check, login, and the cron trigger (it has its own secret).
     if (url.pathname === '/healthz') return send(res, 200, { ok: true, scanning: scanRunning() });

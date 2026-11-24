@@ -186,6 +186,14 @@ Sau mỗi lượt quét, job ở tab Mới / Đã ẩn mà không nguồn nào c
 
 Điểm cộng thêm: job freelance (+5), dưới 10 người bid (+5), đăng trong 24 giờ (+5).
 
+## Kiểm thử
+
+```bash
+npm test
+```
+
+Chạy toàn bộ bài kiểm tra của server (tài khoản, Google, CV, danh sách job, gói Pro, Telegram, giờ nghỉ, báo cáo, blog, tuyển dụng, header bảo mật). Không cần mạng hay database thật: Postgres chạy trong bộ nhớ (PGlite), còn Gemini, Telegram, Google, Resend và các nguồn job đều là bản giả. Chạy riêng một nhóm: `npm test -- feed`. GitHub Actions (`.github/workflows/ci.yml`) build hai ứng dụng và chạy `npm test` mỗi lần push lên `main` hoặc mở pull request.
+
 ## Cấu trúc
 
 Một repo, ba phần, quản lý bằng npm workspaces:
@@ -216,6 +224,7 @@ server/                    API, quét job, AI, Telegram (Node.js, Postgres)
   src/markdown.js          chuyển Markdown thành HTML an toàn
   public/index.html        giao diện hiện tại (sẽ được thay bằng frontend/client)
   config.json              nguồn, kỹ năng, ngưỡng điểm, AI, Telegram
+  test/                    bài kiểm tra (npm test), PGlite và các dịch vụ giả
 frontend/
   shared/                  màu sắc (sáng/tối) và component dùng chung
   client/                  ứng dụng cho người dùng, chạy ở /app/ (React + Vite + Tailwind)

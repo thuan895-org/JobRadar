@@ -4,3 +4,5 @@ node_modules/
 .DS_Store
 profile.md
 dist/
+server/test/last-email.json
+server/test/tg-fail

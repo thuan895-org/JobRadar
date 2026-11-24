@@ -20,6 +20,7 @@
     "build": "npm --workspace @jobradar/client --workspace @jobradar/admin run build",
     "fetch": "npm --workspace @jobradar/server run fetch",
     "migrate": "npm --workspace @jobradar/server run migrate",
-    "telegram:chatid": "npm --workspace @jobradar/server run telegram:chatid"
+    "telegram:chatid": "npm --workspace @jobradar/server run telegram:chatid",
+    "test": "npm --workspace @jobradar/server test --"
   }
 }
