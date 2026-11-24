@@ -33,6 +33,8 @@ Trang cũ ở `/` vẫn dùng `APP_PASSWORD` như trước cho tới khi ứng d
 
 Mỗi tài khoản có **hồ sơ riêng** (kỹ năng chọn từ danh mục hoặc từ khoá tự đặt, từ khoá muốn loại trừ, ngân sách tối thiểu, đoạn giới thiệu cho AI) và **trạng thái job riêng** (lưu, ẩn, đã nộp, điểm AI, bộ apply). Điểm từ khoá được tính theo hồ sơ mỗi khi mở danh sách job, nên mọi người dùng chung một kho job mà vẫn thấy thứ tự riêng. Tóm tắt "10 điểm chính" là theo job nên dùng chung cho mọi người.
 
+**Trang job (`/app/`):** các tab Mới, Đã lưu, Đã nộp, Đã ẩn; tìm kiếm, xếp theo mức phù hợp / mới nhất / điểm từ khoá, lọc theo nguồn và "chỉ nhận người ở VN". Mỗi job hiện điểm (điểm AI nếu đã chấm), ngân sách, số bid, kỹ năng khớp, cảnh báo lừa đảo, 10 điểm chính (tải khi cuộn tới) và mô tả gốc; nút Chuẩn bị apply (bộ apply có nút Copy cho từng phần), AI chấm, Lưu, Đã nộp, Ẩn.
+
 **Tạo hồ sơ (onboarding):** sau khi đăng ký, người dùng chọn một trong hai cách: trả lời bảng hỏi (lĩnh vực và mức độ, số năm kinh nghiệm, tiếng Anh, hình thức làm việc, mức giá, từ khoá thêm/loại trừ, giới thiệu ngắn), hoặc tải CV dạng PDF (tối đa 2 MB). Với CV, người dùng phải tích đồng ý gửi CV cho Gemini; AI đọc CV và điền sẵn bảng hỏi để người dùng kiểm tra rồi mới lưu. Mỗi người phân tích CV tối đa 5 lần/ngày. CV được lưu trong database; người dùng tải về hoặc xoá được trong trang Hồ sơ.
 
 Lần đầu một admin mở ứng dụng mới, dữ liệu của bản một người dùng được chuyển sang tài khoản đó: trạng thái job, điểm AI và bộ apply đã có, kỹ năng trong `server/config.json` và nội dung `profile.md`.

@@ -3,7 +3,7 @@ import { Alert, Button, Card, api } from '@jobradar/shared';
 import { AppLayout } from '../layouts';
 import { useSession } from '../session';
 
-function VerifyBanner() {
+export function VerifyBanner() {
   const { user, config } = useSession();
   const [state, setState] = useState<'idle' | 'busy' | 'sent' | 'off'>('idle');
   if (!user || user.emailVerified) return null;

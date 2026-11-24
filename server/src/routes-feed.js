@@ -81,15 +81,19 @@ async function feed(user, params, config) {
   `, [user.id, cutoff]);
 
   const items = rows.map((r) => feedItem(r, scoreRow(r, scoring)));
+  const tab = STATUSES.includes(params.get('tab')) || params.get('tab') === 'all' ? params.get('tab') : 'new';
+  const regionOnly = (params.get('regionOnly') ?? (profile.region_only ? '1' : '0')) === '1';
+  // New jobs below 0 do not fit the profile at all; saved/applied/hidden ones always show.
+  const minScore = Number(params.get('minScore') ?? (tab === 'new' ? 0 : -999));
+
+  // Tab counts follow the same region filter and fit threshold as the list, so the numbers match what is shown.
   const counts = Object.fromEntries([...STATUSES, 'all'].map((s) => [s, 0]));
   for (const it of items) {
+    if (regionOnly && !it.regionOk && it.status === 'new') continue;
+    if (it.status === 'new' && it.score < 0) continue;
     counts[it.status]++;
     counts.all++;
   }
-
-  const tab = STATUSES.includes(params.get('tab')) || params.get('tab') === 'all' ? params.get('tab') : 'new';
-  const regionOnly = (params.get('regionOnly') ?? (profile.region_only ? '1' : '0')) === '1';
-  const minScore = Number(params.get('minScore') ?? (tab === 'new' ? 0 : -999));
   const source = params.get('source') ?? '';
   const text = (params.get('q') ?? '').trim().toLowerCase().slice(0, 100);
   const shown = items.filter((it) =>

@@ -54,12 +54,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3 sm:gap-6">
           <Link to="/"><Logo /></Link>
-          <nav className="flex gap-1 text-sm font-medium">
-            <Link to="/" className="rounded-md px-3 py-1.5 text-muted hover:bg-bg hover:text-text">Job</Link>
-            <Link to="/profile" className="rounded-md px-3 py-1.5 text-muted hover:bg-bg hover:text-text">Hồ sơ</Link>
-            {user?.role === 'admin' && <a href="/admin/" className="rounded-md px-3 py-1.5 text-muted hover:bg-bg hover:text-text">Admin</a>}
+          <nav className="flex gap-0.5 text-sm font-medium whitespace-nowrap sm:gap-1">
+            <Link to="/" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Job</Link>
+            <Link to="/profile" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Hồ sơ</Link>
+            {user?.role === 'admin' && <a href="/admin/" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Admin</a>}
           </nav>
           <div className="relative ml-auto">
             <button onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Menu tài khoản"

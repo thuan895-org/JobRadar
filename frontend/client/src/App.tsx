@@ -3,14 +3,14 @@ import { Spinner } from '@jobradar/shared';
 import { navigate, useRoute } from './router';
 import { SessionProvider, useSession } from './session';
 import { Consent, Forgot, Login, Reset, Signup, Verify } from './pages/auth';
-import { Home } from './pages/home';
+import { FeedPage } from './pages/feed';
 import { Account } from './pages/account';
 import { Onboarding, ProfilePage } from './pages/profile';
 import { Privacy, Terms } from './pages/legal';
 
 const PUBLIC: Record<string, () => React.JSX.Element> = { '/terms': Terms, '/privacy': Privacy, '/verify': Verify, '/reset': Reset };
 const GUEST_ONLY: Record<string, () => React.JSX.Element> = { '/login': Login, '/signup': Signup, '/forgot': Forgot };
-const PRIVATE: Record<string, () => React.JSX.Element> = { '/': Home, '/account': Account, '/onboarding': Onboarding, '/profile': ProfilePage };
+const PRIVATE: Record<string, () => React.JSX.Element> = { '/': FeedPage, '/account': Account, '/onboarding': Onboarding, '/profile': ProfilePage };
 
 function Redirect({ to }: { to: string }) {
   useEffect(() => navigate(to, { replace: true }), [to]);
