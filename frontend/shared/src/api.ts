@@ -9,6 +9,11 @@ export type User = {
   hasPassword: boolean;
   googleLinked: boolean;
   needsConsent: boolean;
+  plan: 'trial' | 'pro' | 'free';
+  proFeatures: boolean;
+  trialEndsAt: string | null;
+  proUntil: string | null;
+  telegramLinked: boolean;
   createdAt: string;
   lastLoginAt: string | null;
 };
@@ -19,7 +24,13 @@ export type PublicConfig = {
   termsVersion: string;
   operatorName: string;
   contactEmail: string;
+  priceVnd: number;
+  billingMode: string;
+  telegramChannel: string;
 };
+
+/** Days left until an ISO date, at least 0. */
+export const daysLeft = (iso: string | null) => (iso ? Math.max(0, Math.ceil((Date.parse(iso) - Date.now()) / 864e5)) : 0);
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

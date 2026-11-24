@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Card, Spinner, Toggle, api } from '@jobradar/shared';
 import { AppLayout } from '../layouts';
-import { Link } from '../router';
+import { Link, navigate } from '../router';
 import { useSession } from '../session';
 import { VerifyBanner } from './home';
 import { KitDialog } from './kit';
@@ -48,7 +48,7 @@ function ago(iso: string) {
 // ---- "10 điểm chính": only for cards on screen, at most 10 per request ----
 
 function useHighlights(enabled: boolean, jobs: Job[]) {
-  const [points, setPoints] = useState<Record<string, string[] | 'loading' | 'error'>>({});
+  const [points, setPoints] = useState<Record<string, string[] | 'loading' | 'error' | 'limited'>>({});
   const visible = useRef(new Set<string>());
   const asked = useRef(new Set<string>());
   const timer = useRef<number>(0);
@@ -60,8 +60,8 @@ function useHighlights(enabled: boolean, jobs: Job[]) {
     ids.forEach((id) => asked.current.add(id));
     setPoints((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, 'loading' as const])) }));
     try {
-      const r = await api<{ highlights: Record<string, string[]> }>('/api/feed/highlights', { body: { ids } });
-      setPoints((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, r.highlights[id] ?? ('error' as const)])) }));
+      const r = await api<{ highlights: Record<string, string[]>; limited?: boolean }>('/api/feed/highlights', { body: { ids } });
+      setPoints((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, r.highlights[id] ?? (r.limited ? ('limited' as const) : ('error' as const))])) }));
     } catch {
       setPoints((p) => ({ ...p, ...Object.fromEntries(ids.map((id) => [id, 'error' as const])) }));
     }
@@ -103,10 +103,11 @@ function ScoreBadge({ job }: { job: Job }) {
   );
 }
 
-function JobCard({ job, ai, highlights, onRetry, watch, onStatus, onKit, onAiScore }: {
+function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, onAiScore }: {
   job: Job;
   ai: boolean;
-  highlights: string[] | 'loading' | 'error' | undefined;
+  pro: boolean;
+  highlights: string[] | 'loading' | 'error' | 'limited' | undefined;
   onRetry: () => void;
   watch: (el: HTMLElement | null) => void;
   onStatus: (s: Status) => void;
@@ -150,6 +151,8 @@ function JobCard({ job, ai, highlights, onRetry, watch, onStatus, onKit, onAiSco
           <div className="text-xs font-semibold tracking-wide text-brand uppercase">Điểm chính</div>
           {Array.isArray(highlights) ? (
             <ul className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">{highlights.map((p, i) => <li key={i}>{p}</li>)}</ul>
+          ) : highlights === 'limited' ? (
+            <div className="mt-2 text-sm text-muted">Bạn đã dùng hết 20 lượt tóm tắt miễn phí hôm nay. <Link to="/pricing" className="font-semibold text-brand hover:underline">Nâng cấp Pro</Link> để tóm tắt không giới hạn.</div>
           ) : highlights === 'error' ? (
             <div className="mt-2 text-sm text-muted">Chưa tóm tắt được. <button onClick={onRetry} className="font-semibold text-brand hover:underline">Thử lại</button></div>
           ) : (
@@ -166,8 +169,9 @@ function JobCard({ job, ai, highlights, onRetry, watch, onStatus, onKit, onAiSco
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {ai && <Button variant="primary" onClick={onKit}>{job.hasKit ? '📄 Xem bộ apply' : '✍️ Chuẩn bị apply'}</Button>}
-        {ai && !job.ai && <Button busy={scoring} onClick={async () => { setScoring(true); await onAiScore(); setScoring(false); }}>🤖 AI chấm</Button>}
+        {ai && pro && <Button variant="primary" onClick={onKit}>{job.hasKit ? '📄 Xem bộ apply' : '✍️ Chuẩn bị apply'}</Button>}
+        {ai && pro && !job.ai && <Button busy={scoring} onClick={async () => { setScoring(true); await onAiScore(); setScoring(false); }}>🤖 AI chấm</Button>}
+        {ai && !pro && <Button onClick={() => navigate('/pricing')} title="Có trong gói Pro">✍️ Chuẩn bị apply <span className="rounded bg-brand-soft px-1.5 text-[10px] font-bold text-brand">PRO</span></Button>}
         {job.status === 'saved' ? <Button onClick={() => onStatus('new')}>Bỏ lưu</Button> : <Button onClick={() => onStatus('saved')}>⭐ Lưu</Button>}
         {job.status !== 'applied' && <Button onClick={() => onStatus('applied')}>✅ Đã nộp</Button>}
         {job.status === 'hidden' ? <Button onClick={() => onStatus('new')}>Hiện lại</Button> : <Button onClick={() => onStatus('hidden')}>🙈 Ẩn</Button>}
@@ -291,7 +295,7 @@ export function FeedPage() {
         )}
         <div className="space-y-3">
           {jobs.slice(0, shown).map((job) => (
-            <JobCard key={job.id} job={job} ai={Boolean(feed?.ai)} highlights={get(job)} onRetry={() => retry(job.id)} watch={watch}
+            <JobCard key={job.id} job={job} ai={Boolean(feed?.ai)} pro={Boolean(user?.proFeatures)} highlights={get(job)} onRetry={() => retry(job.id)} watch={watch}
               onStatus={(s) => setStatus(job, s)} onKit={() => setKitJob(job)} onAiScore={() => aiScore(job)} />
           ))}
         </div>

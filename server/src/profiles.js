@@ -19,7 +19,7 @@ export const CATALOG = [
   { id: 'qa', label: 'QA / Testing', terms: ['qa', 'tester', 'testing', 'test automation', 'selenium', 'cypress', 'playwright', 'manual testing', 'kiểm thử'] },
   { id: 'telephony', label: 'Tổng đài / CPaaS', terms: ['cpaas', 'twilio', 'vonage', 'plivo', 'voip', 'sip', 'ivr', 'call center', 'contact center', 'auto dialer', 'autodialer', 'dialer', 'asterisk', 'freeswitch', 'sms', 'tổng đài'] },
   { id: 'uiux', label: 'UI/UX design', terms: ['ui/ux', 'ux', 'ui design', 'ux design', 'figma', 'product design', 'wireframe', 'prototype', 'thiết kế giao diện'] },
-  { id: 'graphic', label: 'Thiết kế đồ hoạ', terms: ['graphic design', 'graphic designer', 'photoshop', 'illustrator', 'logo design', 'canva', 'banner', 'branding', 'thiết kế đồ họa', 'thiết kế đồ hoạ'] },
+  { id: 'graphic', label: 'Thiết kế đồ hoạ', terms: ['graphic design', 'graphic designer', 'photoshop', 'illustrator', 'logo', 'logo design', 'canva', 'banner', 'branding', 'thiết kế đồ họa', 'thiết kế đồ hoạ'] },
   { id: 'video', label: 'Dựng video', terms: ['video editing', 'video editor', 'premiere', 'after effects', 'capcut', 'davinci resolve', 'motion graphics', 'youtube', 'dựng video'] },
   { id: 'writing', label: 'Viết nội dung', terms: ['content writing', 'content writer', 'copywriting', 'copywriter', 'blog', 'article', 'seo writing', 'ghostwriting', 'technical writing', 'viết bài', 'viết content'] },
   { id: 'marketing', label: 'Marketing / SEO', terms: ['digital marketing', 'marketing', 'seo', 'social media', 'facebook ads', 'google ads', 'tiktok', 'email marketing', 'growth'] },

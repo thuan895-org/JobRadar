@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Card, Logo, Spinner, api, ApiError, type User } from '@jobradar/shared';
+import { Alert, Card, Logo, Spinner, api, ApiError, daysLeft, type User } from '@jobradar/shared';
+
+const PLAN = { trial: 'Dùng thử', pro: 'Pro', free: 'Free' } as const;
 
 const SECTIONS = [
   { id: 'users', label: 'Người dùng', ready: true },
@@ -43,6 +45,15 @@ function Users() {
   useEffect(() => {
     api<{ users: User[] }>('/api/admin/users').then((r) => setUsers(r.users)).catch((e) => setError(e.message));
   }, []);
+  const grant = async (u: User) => {
+    if (!confirm(`Cộng 30 ngày Pro cho ${u.email}? (ghi vào lịch sử thanh toán với số tiền 0đ)`)) return;
+    try {
+      const r = await api<{ user: User }>(`/api/admin/users/${encodeURIComponent(u.id)}/pro`, { body: { days: 30 } });
+      setUsers((list) => list && list.map((x) => (x.id === u.id ? r.user : x)));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
   const shown = useMemo(() => (users ?? []).filter((u) => `${u.name} ${u.email}`.toLowerCase().includes(q.trim().toLowerCase())), [users, q]);
   if (error) return <Alert kind="error">{error}</Alert>;
   if (!users) return <div className="py-10 text-center text-brand"><Spinner /></div>;
@@ -53,7 +64,7 @@ function Users() {
         <Stat label="Tổng người dùng" value={users.length} />
         <Stat label="Mới trong 7 ngày" value={users.filter((u) => Date.parse(u.createdAt) > weekAgo).length} />
         <Stat label="Đã xác minh email" value={users.filter((u) => u.emailVerified).length} />
-        <Stat label="Dùng Google" value={users.filter((u) => u.googleLinked).length} />
+        <Stat label="Đang Pro / dùng thử" value={users.filter((u) => u.plan !== 'free').length} />
       </div>
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
@@ -64,20 +75,24 @@ function Users() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="bg-bg text-xs uppercase tracking-wide text-muted">
-              <tr><th className="px-4 py-3">Người dùng</th><th className="px-4 py-3">Đăng nhập bằng</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Vai trò</th><th className="px-4 py-3">Tạo lúc</th><th className="px-4 py-3">Lần cuối</th></tr>
+              <tr><th className="px-4 py-3">Người dùng</th><th className="px-4 py-3">Gói</th><th className="px-4 py-3">Đăng nhập bằng</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Vai trò</th><th className="px-4 py-3">Tạo lúc</th><th className="px-4 py-3">Lần cuối</th></tr>
             </thead>
             <tbody className="divide-y divide-line">
               {shown.map((u) => (
                 <tr key={u.id} className="hover:bg-bg/60">
                   <td className="px-4 py-3"><div className="font-medium">{u.name || '—'}</div><div className="text-xs text-muted">{u.email}</div></td>
-                  <td className="px-4 py-3">{[u.hasPassword && 'Mật khẩu', u.googleLinked && 'Google'].filter(Boolean).join(' + ')}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{PLAN[u.plan]}{u.plan === 'pro' ? ` · đến ${fmt(u.proUntil).split(' ')[0]}` : u.plan === 'trial' ? ` · còn ${daysLeft(u.trialEndsAt)} ngày` : ''}</div>
+                    <button onClick={() => grant(u)} className="text-xs font-semibold text-brand hover:underline">+30 ngày Pro</button>
+                  </td>
+                  <td className="px-4 py-3">{[u.hasPassword && 'Mật khẩu', u.googleLinked && 'Google'].filter(Boolean).join(' + ')}{u.telegramLinked ? ' · Telegram' : ''}</td>
                   <td className="px-4 py-3">{u.emailVerified ? <span className="text-good">Đã xác minh</span> : <span className="text-warn">Chưa</span>}</td>
                   <td className="px-4 py-3">{u.role === 'admin' ? <span className="rounded-md bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand">admin</span> : 'user'}</td>
                   <td className="px-4 py-3 text-muted">{fmt(u.createdAt)}</td>
                   <td className="px-4 py-3 text-muted">{fmt(u.lastLoginAt)}</td>
                 </tr>
               ))}
-              {!shown.length && <tr><td colSpan={6} className="px-4 py-10 text-center text-muted">Không có người dùng nào khớp.</td></tr>}
+              {!shown.length && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">Không có người dùng nào khớp.</td></tr>}
             </tbody>
           </table>
         </div>

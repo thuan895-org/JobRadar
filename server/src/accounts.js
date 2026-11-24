@@ -12,6 +12,18 @@ const scrypt = promisify(scryptCb);
 export const TERMS_VERSION = '2026-11-24';
 export const SESSION_DAYS = 30;
 export const MIN_PASSWORD = 8;
+export const TRIAL_DAYS = 7;
+export const PRO_PRICE_VND = 79000;
+
+/** 'pro' while paid, 'trial' in the first 7 days, otherwise 'free'. Admins always get everything. */
+export function planOf(u, at = Date.now()) {
+  if (u.pro_until && Date.parse(u.pro_until) > at) return 'pro';
+  if (u.trial_ends_at && Date.parse(u.trial_ends_at) > at) return 'trial';
+  return 'free';
+}
+
+/** Trial and Pro include the AI features and personal Telegram alerts. */
+export const hasPro = (u) => planOf(u) !== 'free' || adminEmails().has(u.email);
 
 const now = () => new Date().toISOString();
 const hash = (token) => createHash('sha256').update(token).digest('hex');
@@ -55,6 +67,11 @@ export function publicUser(u) {
     hasPassword: Boolean(u.password_hash),
     googleLinked: Boolean(u.google_sub),
     needsConsent: u.terms_version !== TERMS_VERSION,
+    plan: planOf(u),
+    proFeatures: hasPro(u),
+    trialEndsAt: u.trial_ends_at ?? null,
+    proUntil: u.pro_until ?? null,
+    telegramLinked: Boolean(u.telegram_chat_id),
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
   };
@@ -78,10 +95,10 @@ export async function findUserByGoogle(sub) {
 export async function createUser({ email, name, passwordHash = null, googleSub = null, emailVerified = false, acceptTerms = false }) {
   const t = now();
   const { rows } = await q(`
-    INSERT INTO users (id, email, name, password_hash, google_sub, email_verified, terms_version, terms_accepted_at, created_at, last_login_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9) RETURNING *
+    INSERT INTO users (id, email, name, password_hash, google_sub, email_verified, terms_version, terms_accepted_at, created_at, last_login_at, trial_ends_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10) RETURNING *
   `, [randomUUID(), normalizeEmail(email), String(name ?? '').trim().slice(0, 100), passwordHash, googleSub, emailVerified,
-    acceptTerms ? TERMS_VERSION : null, acceptTerms ? t : null, t]);
+    acceptTerms ? TERMS_VERSION : null, acceptTerms ? t : null, t, new Date(Date.parse(t) + TRIAL_DAYS * 864e5).toISOString()]);
   return rows[0];
 }
 

@@ -5,6 +5,7 @@ import { scoreJob } from './score.js';
 import { initDb, pool, upsertJob, getMeta, setMeta, pendingNotifications, markNotified, silenceIneligible, silenceAll, aiCandidates, saveAiScore, getJob, deleteStaleJobs } from './db.js';
 import { telegramConfigured, sendTelegram, formatJob, formatDigest } from './telegram.js';
 import { getTelegramSettings, inQuietHours } from './settings.js';
+import { notifyUsers, channelDigest } from './telegram-users.js';
 import { aiConfigured, scoreJobs } from './ai.js';
 
 // The scan in progress, if any: a second request waits for it instead of starting another.
@@ -145,6 +146,14 @@ async function scan({ force }) {
       }
     } else {
       await silenceAll();
+    }
+    // App users: personal alerts (trial/Pro) and the public channel's daily digest.
+    try {
+      const u = await notifyUsers(config, appUrl(config));
+      if (u.sent) console.log(`[telegram] ${u.sent} personal alerts to app users`);
+      if (await channelDigest(config, appUrl(config))) console.log('[telegram] daily digest posted to the channel');
+    } catch (err) {
+      console.error(`[telegram] app-user alerts failed: ${err.message}`);
     }
     const deleted = await deleteStaleJobs(config.retentionDays ?? 60);
     if (deleted) console.log(`Deleted ${deleted} jobs no source has listed for ${config.retentionDays ?? 60} days`);

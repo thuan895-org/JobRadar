@@ -80,11 +80,36 @@ export async function setupWebhook(appUrl) {
 }
 
 /** Answers a message sent to the bot. The bot only sends job alerts, so this just confirms the connection. */
-export async function handleUpdate(update, appUrl) {
+/** The bot's @username, for t.me links. Asked once, then cached. */
+let botUsername = null;
+export async function getBotUsername() {
+  if (botUsername || !process.env.TELEGRAM_BOT_TOKEN) return botUsername;
+  try {
+    botUsername = (await callTelegram('getMe', {})).username ?? null;
+  } catch (err) {
+    console.error(`[telegram] getMe failed: ${err.message}`);
+  }
+  return botUsername;
+}
+
+/**
+ * Answers a message sent to the bot. "/start <code>" comes from the link on
+ * the app's Telegram page and connects this chat to that account.
+ * `linkAccount(code, chatId)` returns the account's email, or null.
+ */
+export async function handleUpdate(update, appUrl, linkAccount = async () => null) {
   const msg = update?.message;
   if (!msg?.chat || typeof msg.text !== 'string') return;
   const chatId = String(msg.chat.id);
-  const command = msg.text.trim().split(/\s+/)[0].split('@')[0].toLowerCase();
+  const [first, payload] = msg.text.trim().split(/\s+/);
+  const command = first.split('@')[0].toLowerCase();
+  if (command === '/start' && payload) {
+    const email = msg.chat.type === 'private' ? await linkAccount(payload, chatId) : null;
+    await sendTelegram(email
+      ? `✅ <b>Đã liên kết với tài khoản ${esc(email)}.</b>\n\nTừ giờ JobRadar sẽ gửi vào đây những job mới hợp với hồ sơ của bạn. Đổi giờ nghỉ hoặc huỷ liên kết trong mục Telegram của ứng dụng: ${esc(appUrl)}/app/telegram`
+      : '⚠️ Liên kết không hợp lệ hoặc đã hết hạn (hiệu lực 15 phút). Mở lại mục Telegram trong ứng dụng JobRadar và bấm "Liên kết Telegram".', chatId);
+    return;
+  }
   const isOwner = chatId === String(process.env.TELEGRAM_CHAT_ID ?? '');
   if (['/start', '/id', '/help'].includes(command)) {
     const text = isOwner

@@ -5,12 +5,28 @@ import { q, getJob, getMeta, setMeta } from './db.js';
 import { aiConfigured, scoreJobs, applyKit, prepareProfile, analyzeCv } from './ai.js';
 import { highlightsFor } from './highlights.js';
 import { CATALOG, LEVELS, getProfile, saveProfile, scoringConfig, scoreRow, profileText, claimLegacyData, saveCv, saveCvAnalysis, getCv, clearCv, cleanDraftSkills } from './profiles.js';
-import { publicUser } from './accounts.js';
+import { publicUser, hasPro } from './accounts.js';
 import { requireUser, HttpError } from './routes-account.js';
 import { send, readJson, readBytes, limiter } from './http.js';
 
 const CV_MAX = 2 * 1048576;
 const cvAnalyses = limiter(5, 24 * 3600000); // AI reads of a CV per user per day
+const FREE_SUMMARIES = 20; // new job summaries a Free user can open per day
+const freeSeen = new Map(); // `${userId}:${day}` -> job ids summarised for them that day
+function freeAllowance(userId, jobId) {
+  const key = `${userId}:${new Date().toISOString().slice(0, 10)}`;
+  if (!freeSeen.has(key)) {
+    if (freeSeen.size > 10000) freeSeen.clear();
+    freeSeen.set(key, new Set());
+  }
+  const seen = freeSeen.get(key);
+  if (seen.has(jobId)) return true;
+  if (seen.size >= FREE_SUMMARIES) return false;
+  seen.add(jobId);
+  return true;
+}
+const aiScores = limiter(200, 24 * 3600000); // fair use for trial/Pro
+const kits = limiter(40, 24 * 3600000);
 
 /** Keeps letters, digits and a few safe characters from an uploaded file name. */
 function cleanFileName(header) {
@@ -192,6 +208,17 @@ async function route(req, res, url, path, ctx) {
     if (!aiConfigured()) throw new HttpError(400, 'AI chưa được bật trên server.');
     const { ids } = await readJson(req);
     if (!Array.isArray(ids)) throw new HttpError(400, 'ids must be a list');
+    if (!hasPro(user)) {
+      // Free: each job summarised for this user counts once against 20 a day. Already-made summaries are free to show.
+      const wanted = [...new Set(ids.map(String))].slice(0, 10);
+      const allowed = [];
+      for (const id of wanted) {
+        const job = await getJob(id);
+        if (job?.ai_highlights || freeAllowance(user.id, id)) allowed.push(id);
+      }
+      const result = await highlightsFor(allowed);
+      return send(res, 200, { ...result, limited: allowed.length < wanted.length });
+    }
     // At most 10 per request: only what is on screen. The summary is shared by every user.
     return send(res, 200, await highlightsFor([...new Set(ids.map(String))].slice(0, 10)));
   }
@@ -208,10 +235,12 @@ async function route(req, res, url, path, ctx) {
       return send(res, 200, { ok: true, status });
     }
     if (!aiConfigured()) throw new HttpError(400, 'AI chưa được bật trên server.');
+    if (!hasPro(user)) throw new HttpError(402, 'pro_required');
     const text = prepareProfile(profileText(await getProfile(user.id), user));
     const mine = await getUserJob(user.id, id);
     if (m[2] === 'ai-score') {
       if (mine?.ai_checked_at) return send(res, 200, { ai: { score: mine.ai_score, reason: mine.ai_reason, flags: mine.ai_flags, scam: mine.ai_scam } });
+      if (!aiScores.hit(user.id)) throw new HttpError(429, 'Bạn đã dùng AI chấm 200 lần hôm nay. Thử lại vào ngày mai.');
       const [r] = await scoreJobs([job], text);
       if (!r) throw new HttpError(502, 'AI không trả lời được. Thử lại sau.');
       await setUserJob(user.id, id, { ai_score: r.fit, ai_reason: r.reason_vi, ai_flags: JSON.stringify(r.red_flags_vi ?? []), ai_scam: r.scam_risk, ai_checked_at: now() });
@@ -219,6 +248,7 @@ async function route(req, res, url, path, ctx) {
     }
     const { regenerate } = await readJson(req);
     if (mine?.apply_kit && !regenerate) return send(res, 200, { kit: mine.apply_kit });
+    if (!kits.hit(user.id)) throw new HttpError(429, 'Bạn đã soạn 40 bộ apply hôm nay. Thử lại vào ngày mai.');
     const kit = await applyKit(job, text);
     await setUserJob(user.id, id, { apply_kit: JSON.stringify(kit) });
     return send(res, 200, { kit });

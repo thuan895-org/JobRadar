@@ -12,6 +12,7 @@ import { handleAccountRoutes } from './routes-account.js';
 import { handleFeedRoutes } from './routes-feed.js';
 import { highlightsFor } from './highlights.js';
 import { serveApp } from './static.js';
+import { linkChat } from './telegram-users.js';
 
 loadEnv();
 const config = loadConfig();
@@ -126,7 +127,7 @@ const server = createServer(async (req, res) => {
         return send(res, 401, { error: 'bad webhook secret' });
       }
       try {
-        await handleUpdate(JSON.parse(await readRaw(req)), appUrl(config));
+        await handleUpdate(JSON.parse(await readRaw(req)), appUrl(config), linkChat);
       } catch (err) {
         console.error(`[telegram] reply failed: ${err.message}`);
       }

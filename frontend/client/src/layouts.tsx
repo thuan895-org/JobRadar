@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Logo } from '@jobradar/shared';
 import { Link, navigate } from './router';
 import { useSession } from './session';
+import { PlanBadge } from './pages/plans';
 
 const POINTS = [
   ['🇻🇳', 'Chỉ job nhận người ở Việt Nam', 'Lọc sẵn từ nhiều trang việc làm remote và freelance.'],
@@ -61,18 +62,21 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Link to="/profile" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Hồ sơ</Link>
             {user?.role === 'admin' && <a href="/admin/" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Admin</a>}
           </nav>
-          <div className="relative ml-auto">
+          <div className="relative ml-auto flex items-center gap-3">
+            {user && <PlanBadge user={user} />}
             <button onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Menu tài khoản"
               className="grid size-9 place-items-center rounded-full bg-brand-soft font-semibold text-brand hover:ring-2 hover:ring-brand/30">
               {initial}
             </button>
             {open && (
-              <div className="absolute right-0 mt-2 w-60 rounded-xl border border-line bg-surface p-2 shadow-lg" onMouseLeave={() => setOpen(false)}>
+              <div className="absolute top-full right-0 mt-2 w-60 rounded-xl border border-line bg-surface p-2 shadow-lg" onMouseLeave={() => setOpen(false)}>
                 <div className="px-3 py-2">
                   <div className="truncate font-medium">{user?.name || 'Bạn'}</div>
                   <div className="truncate text-xs text-muted">{user?.email}</div>
                 </div>
                 <Link to="/profile" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Hồ sơ</Link>
+                <Link to="/telegram" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Telegram</Link>
+                <Link to="/pricing" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Gói dịch vụ</Link>
                 <Link to="/account" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Tài khoản</Link>
                 <button onClick={async () => { await logout(); navigate('/login'); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm text-warn hover:bg-warn-soft">Đăng xuất</button>
               </div>

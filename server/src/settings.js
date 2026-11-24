@@ -23,7 +23,7 @@ export async function getTelegramSettings() {
 }
 
 /** Checks and saves what the page sent. Throws a Vietnamese message the page can show. */
-export async function saveTelegramSettings(input) {
+export async function saveTelegramSettings(input, { dryRun = false } = {}) {
   const s = {
     quietEnabled: Boolean(input.quietEnabled),
     quietStart: String(input.quietStart ?? ''),
@@ -33,7 +33,7 @@ export async function saveTelegramSettings(input) {
   if (!TIME.test(s.quietStart) || !TIME.test(s.quietEnd)) throw new Error('Giờ phải có dạng HH:MM, ví dụ 00:00.');
   if (s.quietEnabled && s.quietStart === s.quietEnd) throw new Error('Giờ bắt đầu và giờ kết thúc phải khác nhau.');
   if (!validTimezone(s.timezone)) throw new Error(`Múi giờ không hợp lệ: ${s.timezone}`);
-  await setMeta('telegramSettings', s);
+  if (!dryRun) await setMeta('telegramSettings', s);
   return s;
 }
 

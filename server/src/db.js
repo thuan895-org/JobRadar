@@ -116,6 +116,27 @@ export async function initDb() {
       PRIMARY KEY (user_id, job_id)
     );
     CREATE INDEX IF NOT EXISTS user_jobs_status ON user_jobs(user_id, status);
+    -- Plans: a 7-day trial from sign-up, then Free, or Pro until pro_until.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS pro_until TEXT;
+    UPDATE users SET trial_ends_at = to_char((created_at::timestamptz + interval '7 days') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+      WHERE trial_ends_at IS NULL;
+    -- Personal Telegram alerts (Pro and trial): the linked chat and its settings.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_linked_at TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_settings JSONB NOT NULL DEFAULT '{}';
+    CREATE UNIQUE INDEX IF NOT EXISTS users_telegram ON users(telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;
+    -- Payments. While BILLING_MODE is not "live", only test payments exist (no money moves).
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      amount_vnd INTEGER NOT NULL,
+      days INTEGER NOT NULL,
+      method TEXT NOT NULL,
+      status TEXT NOT NULL,
+      note TEXT,
+      created_at TEXT NOT NULL
+    );
     -- When the user agreed to send their CV to the AI (separate from the terms).
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ai_consent_at TEXT;
 

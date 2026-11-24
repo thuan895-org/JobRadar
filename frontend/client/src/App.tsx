@@ -6,11 +6,12 @@ import { Consent, Forgot, Login, Reset, Signup, Verify } from './pages/auth';
 import { FeedPage } from './pages/feed';
 import { Account } from './pages/account';
 import { Onboarding, ProfilePage } from './pages/profile';
+import { CheckoutPage, PricingPage, TelegramPage } from './pages/plans';
 import { Privacy, Terms } from './pages/legal';
 
 const PUBLIC: Record<string, () => React.JSX.Element> = { '/terms': Terms, '/privacy': Privacy, '/verify': Verify, '/reset': Reset };
 const GUEST_ONLY: Record<string, () => React.JSX.Element> = { '/login': Login, '/signup': Signup, '/forgot': Forgot };
-const PRIVATE: Record<string, () => React.JSX.Element> = { '/': FeedPage, '/account': Account, '/onboarding': Onboarding, '/profile': ProfilePage };
+const PRIVATE: Record<string, () => React.JSX.Element> = { '/': FeedPage, '/account': Account, '/onboarding': Onboarding, '/profile': ProfilePage, '/pricing': PricingPage, '/checkout': CheckoutPage, '/telegram': TelegramPage };
 
 function Redirect({ to }: { to: string }) {
   useEffect(() => navigate(to, { replace: true }), [to]);
