@@ -9,6 +9,7 @@ import { listPosts, getPost } from './blog.js';
 import { renderMarkdown, plainText } from './markdown.js';
 import { currentUser } from './routes-account.js';
 import { hasPro, PRO_PRICE_VND } from './accounts.js';
+import { openPost, getPost as getJobPost } from './recruit.js';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const dateVi = (iso) => (iso ? new Date(iso).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
@@ -51,7 +52,7 @@ function page({ title, description, path, appUrl, body, ads, noindex = false, js
 ${noindex ? '<meta name="robots" content="noindex">' : ''}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>` : ''}
 <style>${CSS}</style></head><body>
 <header class="site"><div class="wrap"><a class="logo" href="/"><i>📡</i>JobRadar</a>
-<nav class="site"><a href="/blog">Blog</a><a href="/#gia">Bảng giá</a><a href="/app/login">Đăng nhập</a><a class="btn primary" href="/app/signup">Dùng thử miễn phí</a></nav></div></header>
+<nav class="site"><a href="/app/employer">Đăng tuyển</a><a href="/blog">Blog</a><a href="/#gia">Bảng giá</a><a href="/app/login">Đăng nhập</a><a class="btn primary" href="/app/signup">Dùng thử miễn phí</a></nav></div></header>
 ${body}
 <footer class="site"><div class="wrap"><span>© ${new Date().getFullYear()} JobRadar · Việc remote cho người Việt</span>
 <span><a href="/blog">Blog</a> · <a href="/app/terms">Điều khoản</a> · <a href="/app/privacy">Quyền riêng tư</a>${process.env.TELEGRAM_CHANNEL_URL ? ` · <a href="${esc(process.env.TELEGRAM_CHANNEL_URL)}" rel="noopener">Channel Telegram</a>` : ''}</span></div></footer>
@@ -156,6 +157,43 @@ ${blocks.length <= cut ? adSlot('post', ads) : ''}</main>`;
   }), 'text/html; charset=utf-8');
 }
 
+const EMPLOYMENT = { 'Freelance (trọn gói)': 'CONTRACTOR', 'Freelance (theo giờ)': 'CONTRACTOR', 'Part-time remote': 'PART_TIME', 'Full-time remote': 'FULL_TIME' };
+
+async function jobPage(req, res, appUrl, id) {
+  const post = await openPost(id);
+  if (!post) {
+    const old = await getJobPost(id);
+    if (!old || old.status !== 'closed') return notFound(res, appUrl); // pending or rejected posts do not exist publicly
+    return send(res, 410, page({ title: `${old.title} — JobRadar`, description: '', path: `/viec-lam/${id}`, appUrl, noindex: true, ads: false,
+      body: `<main class="wrap narrow" style="padding:80px 16px;text-align:center"><h1>Tin này đã đóng</h1><p class="meta">${esc(old.title)} · ${esc(old.company)}</p><p><a class="btn primary" href="/app/">Xem job khác</a></p></main>` }), 'text/html; charset=utf-8');
+  }
+  const ads = await showAds(req);
+  const skills = (post.skills ?? []).map((s) => `<span style="display:inline-block;margin:0 6px 6px 0;padding:2px 10px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-size:13px">${esc(s)}</span>`).join('');
+  const body = `<main class="wrap narrow"><article class="post">
+<div class="meta" style="margin-top:32px"><span style="color:var(--good);font-weight:600">✓ Tin đăng trực tiếp trên JobRadar, đã được duyệt</span></div>
+<h1>${esc(post.title)}</h1>
+<div class="meta">${post.company_url ? `<a href="${esc(post.company_url)}" rel="noopener nofollow" target="_blank">${esc(post.company)}</a>` : esc(post.company)} · ${esc(post.kind)} · Remote, nhận người ở Việt Nam${post.budget_text ? ` · <b style="color:var(--good)">${esc(post.budget_text)}</b>` : ''}</div>
+<div class="meta">Đăng ${dateVi(post.approved_at)} · hạn ${dateVi(post.expires_at)}</div>
+${skills ? `<div style="margin-top:16px">${skills}</div>` : ''}
+<div class="body" style="white-space:pre-line;margin-top:20px">${esc(post.description)}</div>
+<p style="margin-top:28px"><a class="btn primary" href="/app/jobs/${esc(post.id)}">Ứng tuyển trên JobRadar</a></p>
+<p class="meta">Nhà tuyển dụng không được thu bất kỳ khoản phí nào của ứng viên. Gặp yêu cầu chuyển tiền, hãy báo cáo tin này trong ứng dụng.</p>
+</article>${adSlot('post', ads)}</main>`;
+  const salary = post.budget_min_usd || post.budget_max_usd
+    ? { '@type': 'MonetaryAmount', currency: 'USD', value: { '@type': 'QuantitativeValue', minValue: post.budget_min_usd ?? undefined, maxValue: post.budget_max_usd ?? undefined, unitText: post.kind === 'Freelance (theo giờ)' ? 'HOUR' : post.kind === 'Full-time remote' || post.kind === 'Part-time remote' ? 'MONTH' : 'PROJECT' } }
+    : undefined;
+  send(res, 200, page({
+    title: `${post.title} — ${post.company} | JobRadar`, description: plainText(post.description).slice(0, 160), path: `/viec-lam/${post.id}`, appUrl, body, ads,
+    jsonLd: {
+      '@context': 'https://schema.org', '@type': 'JobPosting', title: post.title, description: esc(post.description).replace(/\n/g, '<br>'),
+      datePosted: post.approved_at, validThrough: post.expires_at, employmentType: EMPLOYMENT[post.kind] ?? 'CONTRACTOR',
+      hiringOrganization: { '@type': 'Organization', name: post.company, ...(post.company_url ? { sameAs: post.company_url } : {}) },
+      jobLocationType: 'TELECOMMUTE', applicantLocationRequirements: { '@type': 'Country', name: 'Vietnam' },
+      directApply: post.apply_mode === 'in_app', ...(salary ? { baseSalary: salary } : {}),
+    },
+  }), 'text/html; charset=utf-8');
+}
+
 function notFound(res, appUrl) {
   send(res, 404, page({ title: 'Không tìm thấy — JobRadar', description: '', path: '/404', appUrl, noindex: true, ads: false,
     body: '<main class="wrap narrow" style="padding:80px 16px;text-align:center"><h1>Không tìm thấy trang</h1><p class="meta">Trang này không tồn tại hoặc đã bị gỡ.</p><p><a class="btn primary" href="/">Về trang chủ</a></p></main>' }), 'text/html; charset=utf-8');
@@ -169,6 +207,8 @@ export async function handlePublicPages(req, res, url, appUrl) {
   if (path === '/blog') return blogIndex(req, res, appUrl), true;
   const m = path.match(/^\/blog\/([a-z0-9-]{1,80})$/);
   if (m) return blogPost(req, res, appUrl, m[1]), true;
+  const jp = path.match(/^\/viec-lam\/([a-z0-9]{12})$/);
+  if (jp) return jobPage(req, res, appUrl, jp[1]), true;
   if (path === '/robots.txt') {
     send(res, 200, `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /app/\nAllow: /app/terms\nAllow: /app/privacy\nDisallow: /admin/\nDisallow: /classic\nSitemap: ${appUrl}/sitemap.xml\n`, 'text/plain; charset=utf-8');
     return true;
@@ -180,7 +220,8 @@ export async function handlePublicPages(req, res, url, appUrl) {
   }
   if (path === '/sitemap.xml') {
     const posts = await listPosts({ limit: 1000 });
-    const urls = [['/', null], ['/blog', posts[0]?.updated_at], ['/app/terms', null], ['/app/privacy', null], ...posts.map((p) => [`/blog/${p.slug}`, p.updated_at])];
+    const { rows: openJobs } = await q(`SELECT id, updated_at FROM job_posts WHERE status = 'approved' AND expires_at > $1`, [new Date().toISOString()]);
+    const urls = [['/', null], ['/blog', posts[0]?.updated_at], ['/app/terms', null], ['/app/privacy', null], ...posts.map((p) => [`/blog/${p.slug}`, p.updated_at]), ...openJobs.map((j) => [`/viec-lam/${j.id}`, j.updated_at])];
     send(res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([u, d]) => `  <url><loc>${esc(appUrl + u)}</loc>${d ? `<lastmod>${d.slice(0, 10)}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>\n`, 'application/xml; charset=utf-8');
     return true;
   }

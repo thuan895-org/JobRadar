@@ -49,6 +49,12 @@ Mỗi tài khoản có **hồ sơ riêng** (kỹ năng chọn từ danh mục ho
 - **Chi phí AI:** số lần gọi và token theo loại việc, theo model và theo người dùng (24 giờ / 7 ngày / 30 ngày). Muốn thấy tiền, điền giá vào `ai.pricing` trong `server/config.json`: `{"<model>": {"input": <USD/1 triệu token>, "output": <USD/1 triệu token>}}` theo bảng giá hiện tại của Google.
 - **Thanh toán:** lịch sử bật Pro; doanh thu thật không tính thanh toán thử nghiệm.
 
+**Tuyển dụng (Phase 2):**
+- Ai cũng đăng tin được ở `/app/employer` (tạm miễn phí, tối đa 5 tin chờ duyệt hoặc đang mở). Tin cần **admin duyệt** trong `/admin/` → Tin tuyển dụng (duyệt, hoặc từ chối kèm lý do để người đăng sửa). Sửa tin đã duyệt thì tin quay về chờ duyệt.
+- Tin đã duyệt trở thành một job bình thường (nguồn "JobRadar", huy hiệu ✓ Đã xác minh): có trong danh sách job, Telegram và channel, được chấm theo hồ sơ từng người, có trang công khai `/viec-lam/<id>` với dữ liệu JobPosting cho Google for Jobs và có trong sitemap. Tin tự đóng sau 30 ngày.
+- Ứng viên ứng tuyển trong app (lời nhắn, hồ sơ, CV nếu chọn) sau khi tích đồng ý chia sẻ với nhà tuyển dụng đó; hoặc qua link ngoài nếu nhà tuyển dụng chọn vậy. Mỗi người tối đa 20 đơn/ngày. Nhà tuyển dụng nhận email (nếu bật Resend), xem ứng viên, tải CV, đánh dấu vào vòng sau / không phù hợp; ứng viên thấy trạng thái ở "Đơn đã gửi".
+- Điều khoản cấm nhà tuyển dụng thu phí ứng viên. Chính sách quyền riêng tư có thêm phần chia sẻ hồ sơ khi ứng tuyển, nên người dùng được hỏi đồng ý lại.
+
 **Trang công khai, blog và quảng cáo:**
 - `/` là landing page (render ở server để Google đọc được). Trang một người dùng cũ chuyển sang **`/classic`**, vẫn đăng nhập bằng `APP_PASSWORD`.
 - Blog: viết trong `/admin/` → Blog (Markdown, có xem trước, nháp/đăng, đường dẫn tự tạo từ tiêu đề). Bài đăng ở `/blog/<đường-dẫn>`, có trong `/sitemap.xml`. `robots.txt` chặn `/app/`, `/admin/`, `/api/`. Nội dung bài luôn được escape: không chèn được HTML hay script.
@@ -204,7 +210,8 @@ server/                    API, quét job, AI, Telegram (Node.js, Postgres)
   src/billing.js           gói Pro, thanh toán (thử nghiệm), lịch sử thanh toán
   src/telegram-users.js    liên kết Telegram theo người, báo job riêng, bản tin channel
   src/reports.js           báo cáo job, quyết định của admin, thống kê nguồn và mức dùng AI
-  src/public-pages.js      landing page, blog, sitemap, robots.txt, ads.txt, ô quảng cáo
+  src/public-pages.js      landing page, blog, trang tin tuyển dụng, sitemap, robots.txt, ads.txt, ô quảng cáo
+  src/recruit.js           đăng tin tuyển dụng, duyệt, ứng tuyển, quản lý ứng viên
   src/blog.js              bài viết blog
   src/markdown.js          chuyển Markdown thành HTML an toàn
   public/index.html        giao diện hiện tại (sẽ được thay bằng frontend/client)

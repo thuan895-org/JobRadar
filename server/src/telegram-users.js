@@ -54,7 +54,7 @@ async function pendingForUser(user, config) {
   const since = new Date(Math.max(Date.now() - config.telegram.maxAgeHours * 3.6e6, Date.parse(user.telegram_linked_at) || 0)).toISOString();
   const { rows } = await q(`
     SELECT j.*, uj.status AS my_status FROM jobs j LEFT JOIN user_jobs uj ON uj.job_id = j.id AND uj.user_id = $1
-    WHERE j.first_seen >= $2 AND COALESCE(j.posted_at, j.first_seen) >= $3 AND NOT COALESCE(uj.notified, FALSE) AND j.flag IS DISTINCT FROM 'scam'
+    WHERE j.first_seen >= $2 AND COALESCE(j.posted_at, j.first_seen) >= $3 AND NOT COALESCE(uj.notified, FALSE) AND COALESCE(j.flag, '') NOT IN ('scam', 'closed')
   `, [user.id, since, new Date(Date.now() - config.telegram.maxAgeHours * 3.6e6).toISOString()]);
   const profile = await getProfile(user.id);
   const scoring = scoringConfig(profile, config);
@@ -132,7 +132,7 @@ export async function channelDigest(config, appUrl, at = new Date()) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(at);
   if (Number(localTime(at, tz).slice(0, 2)) < hour || (await getMeta('channelDigestDay')) === today) return false;
   const since = new Date(at.getTime() - 24 * 3.6e6).toISOString();
-  const { rows } = await q(`SELECT * FROM jobs WHERE region_ok AND first_seen >= $1 AND flag IS DISTINCT FROM 'scam' ORDER BY first_seen DESC LIMIT 400`, [since]);
+  const { rows } = await q(`SELECT * FROM jobs WHERE region_ok AND first_seen >= $1 AND COALESCE(flag, '') NOT IN ('scam', 'closed') ORDER BY first_seen DESC LIMIT 400`, [since]);
   const picked = rows
     .map((r) => ({ ...r, tags: r.tags ?? [], category: categoryOf(r, config) }))
     .filter((j) => j.category !== 'Khác')

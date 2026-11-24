@@ -30,7 +30,7 @@ type Job = {
   status: Status;
   ai: { score: number; reason: string; flags: string[]; scam: 'low' | 'medium' | 'high' } | null;
   hasKit: boolean;
-  flag: 'scam' | 'verified' | null;
+  flag: 'scam' | 'verified' | 'closed' | null;
   highlights: string[] | null;
 };
 type Feed = { jobs: Job[]; total: number; counts: Record<Status | 'all', number>; sources: string[]; hasProfile: boolean; regionOnly: boolean; ai: boolean };
@@ -127,7 +127,9 @@ function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, on
       <div className="flex gap-4">
         <ScoreBadge job={job} />
         <div className="min-w-0 flex-1">
-          <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-[17px] leading-snug font-semibold hover:text-brand">{job.title}</a>
+          {job.id.startsWith('jobradar:')
+            ? <Link to={`/jobs/${job.id.slice(9)}`} className="text-[17px] leading-snug font-semibold hover:text-brand">{job.title}</Link>
+            : <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-[17px] leading-snug font-semibold hover:text-brand">{job.title}</a>}
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted">
             {job.budgetText && <span className="font-semibold text-good">{job.budgetText}</span>}
             {meta.map((m) => <span key={m}>{m}</span>)}
@@ -137,6 +139,8 @@ function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, on
             <div className="mt-3 flex flex-wrap gap-1.5">
               {job.flag === 'verified' && <span className="rounded-full bg-good-soft px-2.5 py-0.5 text-xs font-semibold text-good" title="Đội JobRadar đã kiểm tra job này">✓ Đã xác minh</span>}
               {job.flag === 'scam' && <span className="rounded-full bg-warn px-2.5 py-0.5 text-xs font-semibold text-surface">⛔ Đã xác nhận lừa đảo</span>}
+              {job.flag === 'closed' && <span className="rounded-full bg-bg px-2.5 py-0.5 text-xs font-semibold text-muted">Đã đóng</span>}
+              {job.source === 'JobRadar' && <span className="rounded-full bg-brand px-2.5 py-0.5 text-xs font-semibold text-on-brand">Đăng trên JobRadar</span>}
               {job.ai?.scam === 'high' && <span className="rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn">⚠️ Nghi lừa đảo</span>}
               {job.ai?.scam === 'medium' && <span className="rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn">⚠️ Cần cẩn thận</span>}
               {job.vietnameseClient && <span className="rounded-full bg-good-soft px-2.5 py-0.5 text-xs font-semibold text-good">🇻🇳 Khách Việt</span>}
@@ -184,7 +188,9 @@ function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, on
         {job.status === 'hidden' ? <Button onClick={() => onStatus('new')}>Hiện lại</Button> : <Button onClick={() => onStatus('hidden')}>🙈 Ẩn</Button>}
         <span className="ml-auto flex items-center gap-4 self-center">
           <button onClick={onReport} className="text-sm text-muted hover:text-warn" title="Báo cáo job lừa đảo, hết hạn, sai thông tin, hoặc nhờ kiểm tra">⚑ Báo cáo</button>
-          <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand hover:underline">Mở job ↗</a>
+          {job.id.startsWith('jobradar:')
+            ? <Link to={`/jobs/${job.id.slice(9)}`} className="text-sm font-semibold text-brand hover:underline">Ứng tuyển →</Link>
+            : <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand hover:underline">Mở job ↗</a>}
         </span>
       </div>
     </article>

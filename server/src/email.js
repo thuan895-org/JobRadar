@@ -47,6 +47,14 @@ export function sendVerifyEmail(to, link, isLocal) {
   });
 }
 
+export function sendApplicationEmail(to, jobTitle, link, isLocal) {
+  return sendEmail({
+    to, link, isLocal,
+    subject: `Hồ sơ ứng tuyển mới: ${jobTitle}`.slice(0, 150),
+    html: layout('Bạn có hồ sơ ứng tuyển mới', `Một ứng viên vừa ứng tuyển tin <b>${esc(jobTitle)}</b> trên JobRadar.`, 'Xem hồ sơ', link),
+  });
+}
+
 export function sendResetEmail(to, link, isLocal) {
   return sendEmail({
     to, link, isLocal,

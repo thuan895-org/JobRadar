@@ -162,6 +162,44 @@ export async function initDb() {
       output_tokens INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS ai_usage_at ON ai_usage(at);
+    -- Jobs posted on JobRadar by employers; approved posts also live in jobs as 'jobradar:<id>'.
+    CREATE TABLE IF NOT EXISTS job_posts (
+      id TEXT PRIMARY KEY,
+      employer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      job_id TEXT,
+      title TEXT NOT NULL,
+      company TEXT NOT NULL,
+      company_url TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL,
+      skills JSONB NOT NULL DEFAULT '[]',
+      kind TEXT NOT NULL,
+      budget_text TEXT NOT NULL DEFAULT '',
+      budget_min_usd INTEGER,
+      budget_max_usd INTEGER,
+      apply_mode TEXT NOT NULL DEFAULT 'in_app',
+      apply_url TEXT NOT NULL DEFAULT '',
+      contact_email TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      reject_reason TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      approved_at TEXT,
+      expires_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS job_posts_status ON job_posts(status, created_at);
+    -- Applications sent inside JobRadar. The profile text is a snapshot taken when applying.
+    CREATE TABLE IF NOT EXISTS applications (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL REFERENCES job_posts(id) ON DELETE CASCADE,
+      applicant_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      message TEXT NOT NULL,
+      share_cv BOOLEAN NOT NULL DEFAULT FALSE,
+      profile_snapshot TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'sent',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (post_id, applicant_id)
+    );
     -- Blog posts (Markdown), written in the admin app.
     CREATE TABLE IF NOT EXISTS posts (
       id TEXT PRIMARY KEY,
@@ -295,7 +333,7 @@ export async function pendingNotifications({ minScore, maxAgeHours }) {
   const cutoff = new Date(Date.now() - maxAgeHours * 3.6e6).toISOString();
   const { rows } = await q(`
     SELECT * FROM jobs
-    WHERE NOT notified AND status = 'new' AND region_ok AND score >= $1 AND flag IS DISTINCT FROM 'scam'
+    WHERE NOT notified AND status = 'new' AND region_ok AND score >= $1 AND COALESCE(flag, '') NOT IN ('scam', 'closed')
       AND COALESCE(posted_at, first_seen) >= $2
     ORDER BY score DESC
   `, [minScore, cutoff]);

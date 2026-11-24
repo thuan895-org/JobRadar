@@ -5,7 +5,7 @@ import { DocLayout } from '../layouts';
 import { Link } from '../router';
 import { useSession } from '../session';
 
-const UPDATED = '25/11/2026';
+const UPDATED = '26/11/2026';
 
 function useOperator() {
   const { config } = useSession();
@@ -46,7 +46,8 @@ export function Privacy() {
       <h2>3. Mục đích sử dụng</h2>
       <ul>
         <li>Lọc và xếp hạng job phù hợp với hồ sơ của bạn, tóm tắt job, chấm mức phù hợp và soạn nháp hồ sơ ứng tuyển theo yêu cầu của bạn.</li>
-        <li>Gửi thông báo job qua Telegram và email liên quan đến tài khoản (xác minh email, đặt lại mật khẩu).</li>
+        <li>Gửi thông báo job qua Telegram và email liên quan đến tài khoản (xác minh email, đặt lại mật khẩu, có hồ sơ ứng tuyển mới).</li>
+        <li>Khi bạn <b>ứng tuyển một tin đăng trên JobRadar</b> và tích ô đồng ý: chia sẻ tên, email, lời nhắn, nội dung hồ sơ và (nếu bạn chọn) CV của bạn với đúng nhà tuyển dụng đăng tin đó. Nhà tuyển dụng tự chịu trách nhiệm về việc dùng các thông tin này để tuyển dụng.</li>
         <li>Bảo mật, chống lạm dụng và hỗ trợ khi bạn liên hệ.</li>
       </ul>
       <p>Chúng tôi không bán dữ liệu của bạn và không dùng dữ liệu của bạn để quảng cáo nhắm theo cá nhân.</p>
@@ -120,6 +121,14 @@ export function Terms() {
       <ul>
         <li>Thu thập dữ liệu tự động từ JobRadar, hoặc dùng tính năng AI để tạo nội dung vi phạm pháp luật.</li>
         <li>Tạo nhiều tài khoản để lách giới hạn, chia sẻ tài khoản trả phí, hoặc tấn công, làm gián đoạn dịch vụ.</li>
+      </ul>
+
+      <h2>7a. Nhà tuyển dụng đăng tin trên JobRadar</h2>
+      <ul>
+        <li>Tin phải là việc làm có thật, mô tả trung thực; JobRadar duyệt trước khi hiển thị và có thể từ chối, đóng hoặc gỡ tin bất kỳ lúc nào.</li>
+        <li><b>Nghiêm cấm thu bất kỳ khoản phí nào của ứng viên</b> (phí hồ sơ, đặt cọc, mua khoá học, mua thiết bị…), yêu cầu giấy tờ tuỳ thân trước khi tuyển, hoặc tuyển cho việc vi phạm pháp luật.</li>
+        <li>Thông tin ứng viên nhận được chỉ được dùng để tuyển dụng cho tin đó, không chia sẻ cho bên khác, và phải được xoá khi không còn cần.</li>
+        <li>JobRadar không phải bên tuyển dụng hay trung gian thanh toán, không bảo đảm kết quả tuyển dụng.</li>
       </ul>
 
       <h2>8. Quyền sở hữu</h2>

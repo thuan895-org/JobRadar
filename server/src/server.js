@@ -14,6 +14,7 @@ import { highlightsFor } from './highlights.js';
 import { serveApp } from './static.js';
 import { linkChat } from './telegram-users.js';
 import { handlePublicPages } from './public-pages.js';
+import { handleRecruitRoutes } from './recruit.js';
 
 loadEnv();
 const config = loadConfig();
@@ -139,6 +140,7 @@ const server = createServer(async (req, res) => {
     // Accounts (new apps) and the built apps themselves: they have their own login.
     if (await handleAccountRoutes(req, res, url, { appUrl: appUrl(config), isLocal: !PUBLIC })) return;
     if (await handleFeedRoutes(req, res, url, { config })) return;
+    if (await handleRecruitRoutes(req, res, url, { appUrl: appUrl(config), isLocal: !PUBLIC })) return;
     if (await serveApp(req, res, url)) return;
     // Landing page, blog, sitemap: public, rendered here for search engines.
     if (await handlePublicPages(req, res, url, appUrl(config))) return;

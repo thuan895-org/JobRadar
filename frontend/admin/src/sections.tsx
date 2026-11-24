@@ -271,3 +271,54 @@ export function Blog() {
     </div>
   );
 }
+
+// ---- Job posts from employers ----
+
+type JobPost = { id: string; title: string; company: string; companyUrl: string; description: string; skills: string[]; kind: string; budgetText: string;
+  applyMode: string; applyUrl: string | null; status: string; createdAt: string; expiresAt: string | null; employerEmail: string; rejectReason: string | null };
+
+export function JobPosts() {
+  const [status, setStatus] = useState('pending');
+  const { data, error, reload } = useData<{ posts: JobPost[] }>(`/api/admin/job-posts?status=${status}`);
+  const [open, setOpen] = useState<string | null>(null);
+  const act = async (p: JobPost, action: 'approve' | 'reject' | 'close') => {
+    let body: object = {};
+    if (action === 'reject') {
+      const reason = prompt('Lý do từ chối (nhà tuyển dụng sẽ thấy để sửa):');
+      if (!reason) return;
+      body = { reason };
+    }
+    if (action === 'close' && !confirm(`Đóng tin "${p.title}"?`)) return;
+    await api(`/api/admin/job-posts/${p.id}/${action}`, { body }).catch((e) => alert(e.message));
+    reload();
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {[['pending', 'Chờ duyệt'], ['approved', 'Đang mở'], ['rejected', 'Đã từ chối'], ['closed', 'Đã đóng'], ['all', 'Tất cả']].map(([v, l]) => (
+          <button key={v} onClick={() => setStatus(v)} className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${status === v ? 'bg-text text-bg' : 'text-muted hover:bg-surface'}`}>{l}</button>
+        ))}
+      </div>
+      <Alert>Trước khi duyệt: việc có thật, mô tả rõ, không thu phí ứng viên, không đòi giấy tờ tuỳ thân, link ứng tuyển an toàn.</Alert>
+      {!data ? <Loading error={error} /> : !data.posts.length ? <Card className="py-10 text-center text-muted">Không có tin nào.</Card> : data.posts.map((p) => (
+        <Card key={p.id}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-semibold">{p.title}</div>
+              <div className="text-sm text-muted">{p.company}{p.companyUrl ? <> · <a href={p.companyUrl} target="_blank" rel="noopener noreferrer nofollow" className="text-brand">{p.companyUrl}</a></> : null} · {p.kind}{p.budgetText ? ` · ${p.budgetText}` : ''}</div>
+              <div className="text-xs text-muted">{p.employerEmail} · gửi {fmt(p.createdAt)} · {p.applyMode === 'url' ? `nhận hồ sơ qua ${p.applyUrl}` : 'nhận hồ sơ trên JobRadar'}</div>
+              {p.rejectReason && <div className="mt-1 text-xs text-warn">Đã từ chối: {p.rejectReason}</div>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {p.status === 'pending' && <><Button variant="primary" onClick={() => act(p, 'approve')}>Duyệt</Button><Button variant="danger" onClick={() => act(p, 'reject')}>Từ chối</Button></>}
+              {p.status === 'approved' && <><a href={`/viec-lam/${p.id}`} target="_blank" rel="noopener" className="rounded-lg border border-line px-3.5 py-2 text-sm font-semibold">Xem ↗</a><Button variant="danger" onClick={() => act(p, 'close')}>Đóng</Button></>}
+            </div>
+          </div>
+          {p.skills.length > 0 && <div className="mt-2 text-xs text-muted">Kỹ năng: {p.skills.join(', ')}</div>}
+          <button onClick={() => setOpen(open === p.id ? null : p.id)} className="mt-2 text-sm font-medium text-muted hover:text-text">{open === p.id ? '▾ Ẩn mô tả' : '▸ Xem mô tả'}</button>
+          {open === p.id && <p className="mt-2 rounded-lg bg-bg px-3 py-2 text-sm whitespace-pre-wrap">{p.description}</p>}
+        </Card>
+      ))}
+    </div>
+  );
+}

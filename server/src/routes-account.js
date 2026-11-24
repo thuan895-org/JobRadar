@@ -16,6 +16,7 @@ import { PRO_PRICE_VND } from './accounts.js';
 import { listReports, resolveReport, sourceStats, aiUsageStats } from './reports.js';
 import { createPost, updatePost, removePost, listPosts, getPost } from './blog.js';
 import { renderMarkdown } from './markdown.js';
+import { listPostsForAdmin, approvePost, rejectPost, closePost } from './recruit.js';
 
 const SESSION_COOKIE = 'jr_user';
 const OAUTH_COOKIE = 'jr_oauth';
@@ -359,6 +360,23 @@ async function route(req, res, url, path, ctx) {
       if (!['scam', 'verified', 'dismiss', 'unflag'].includes(action)) throw new HttpError(400, 'Hành động không hợp lệ.');
       if (!(await resolveReport(decodeURIComponent(resolve[1]), action, user.email))) throw new HttpError(404, 'Không tìm thấy báo cáo.');
       return send(res, 200, { ok: true });
+    }
+    if (method === 'GET' && path === '/api/admin/job-posts') {
+      return send(res, 200, { posts: await listPostsForAdmin(url.searchParams.get('status') ?? 'pending') });
+    }
+    const jp = path.match(/^\/api\/admin\/job-posts\/([a-z0-9]{12})\/(approve|reject|close)$/);
+    if (method === 'POST' && jp) {
+      if (jp[2] === 'approve') {
+        const p = await approvePost(jp[1], ctx.appUrl);
+        return p ? send(res, 200, { ok: true }) : send(res, 400, { error: 'Tin không ở trạng thái chờ duyệt.' });
+      }
+      if (jp[2] === 'reject') {
+        const { reason } = await readJson(req);
+        const why = String(reason ?? '').trim().slice(0, 500);
+        if (!why) throw new HttpError(400, 'Ghi lý do để nhà tuyển dụng sửa.');
+        return (await rejectPost(jp[1], why)) ? send(res, 200, { ok: true }) : send(res, 400, { error: 'Tin không ở trạng thái chờ duyệt.' });
+      }
+      return (await closePost(jp[1])) ? send(res, 200, { ok: true }) : send(res, 404, { error: 'Không tìm thấy tin.' });
     }
     if (method === 'GET' && path === '/api/admin/posts') {
       return send(res, 200, { posts: await listPosts({ publishedOnly: false, limit: 500 }) });

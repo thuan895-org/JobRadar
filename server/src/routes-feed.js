@@ -100,7 +100,8 @@ async function feed(user, params, config) {
   `, [user.id, cutoff]);
 
   // A job the admin marked as a scam disappears from New; if the user saved it, it stays there with a warning.
-  const items = rows.map((r) => feedItem(r, scoreRow(r, scoring))).filter((it) => !(it.flag === 'scam' && it.status === 'new'));
+  // Scam or closed jobs leave New; anyone who saved or applied keeps them, with a mark.
+  const items = rows.map((r) => feedItem(r, scoreRow(r, scoring))).filter((it) => !((it.flag === 'scam' || it.flag === 'closed') && it.status === 'new'));
   const tab = STATUSES.includes(params.get('tab')) || params.get('tab') === 'all' ? params.get('tab') : 'new';
   const regionOnly = (params.get('regionOnly') ?? (profile.region_only ? '1' : '0')) === '1';
   // New jobs below 0 do not fit the profile at all; saved/applied/hidden ones always show.
@@ -118,7 +119,7 @@ async function feed(user, params, config) {
   const text = (params.get('q') ?? '').trim().toLowerCase().slice(0, 100);
   const shown = items.filter((it) =>
     (tab === 'all' || it.status === tab)
-    && (!regionOnly || it.regionOk)
+    && (!regionOnly || it.regionOk || it.status !== 'new') // the region filter is for discovering; saved/applied jobs always show
     && it.score >= minScore
     && (!source || it.source === source)
     && (!text || `${it.title} ${it.company} ${it.description}`.toLowerCase().includes(text)));

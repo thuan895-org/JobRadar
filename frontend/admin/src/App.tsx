@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Card, Logo, Spinner, api, ApiError, daysLeft, type User } from '@jobradar/shared';
-import { AiUsage, Blog, Payments, Reports, Sources } from './sections';
+import { AiUsage, Blog, JobPosts, Payments, Reports, Sources } from './sections';
 
 const PLAN = { trial: 'Dùng thử', pro: 'Pro', free: 'Free' } as const;
 
 const SECTIONS = [
   { id: 'users', label: 'Người dùng', ready: true },
+  { id: 'jobposts', label: 'Tin tuyển dụng', ready: true },
   { id: 'reports', label: 'Báo cáo job', ready: true },
   { id: 'sources', label: 'Nguồn job', ready: true },
   { id: 'ai', label: 'Chi phí AI', ready: true },
   { id: 'payments', label: 'Thanh toán', ready: true },
   { id: 'blog', label: 'Blog', ready: true },
 ];
-const PAGES: Record<string, () => React.JSX.Element> = { users: Users, reports: Reports, sources: Sources, ai: AiUsage, payments: Payments, blog: Blog };
+const PAGES: Record<string, () => React.JSX.Element> = { users: Users, reports: Reports, sources: Sources, ai: AiUsage, payments: Payments, blog: Blog, jobposts: JobPosts };
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 

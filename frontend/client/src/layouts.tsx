@@ -60,6 +60,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <nav className="flex gap-0.5 text-sm font-medium whitespace-nowrap sm:gap-1">
             <Link to="/" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Job</Link>
             <Link to="/profile" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Hồ sơ</Link>
+            <Link to="/employer" className="hidden rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:inline sm:px-3">Đăng tuyển</Link>
             {user?.role === 'admin' && <a href="/admin/" className="rounded-md px-2 py-1.5 text-muted hover:bg-bg hover:text-text sm:px-3">Admin</a>}
           </nav>
           <div className="relative ml-auto flex items-center gap-3">
@@ -75,6 +76,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   <div className="truncate text-xs text-muted">{user?.email}</div>
                 </div>
                 <Link to="/profile" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Hồ sơ</Link>
+                <Link to="/applications" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Đơn đã gửi</Link>
+                <Link to="/employer" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Đăng tuyển</Link>
                 <Link to="/telegram" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Telegram</Link>
                 <Link to="/pricing" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Gói dịch vụ</Link>
                 <Link to="/account" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Tài khoản</Link>
