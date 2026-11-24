@@ -77,3 +77,15 @@ export function limiter(max, windowMs) {
     },
   };
 }
+
+/** Reads a binary body (an uploaded file) up to `limit` bytes. */
+export async function readBytes(req, limit) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > limit) throw Object.assign(new Error(`Tệp quá lớn (tối đa ${Math.round(limit / 1048576)} MB).`), { status: 413 });
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}

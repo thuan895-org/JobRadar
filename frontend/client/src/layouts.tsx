@@ -58,7 +58,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <Link to="/"><Logo /></Link>
           <nav className="flex gap-1 text-sm font-medium">
             <Link to="/" className="rounded-md px-3 py-1.5 text-muted hover:bg-bg hover:text-text">Job</Link>
-            <Link to="/account" className="rounded-md px-3 py-1.5 text-muted hover:bg-bg hover:text-text">Tài khoản</Link>
+            <Link to="/profile" className="rounded-md px-3 py-1.5 text-muted hover:bg-bg hover:text-text">Hồ sơ</Link>
             {user?.role === 'admin' && <a href="/admin/" className="rounded-md px-3 py-1.5 text-muted hover:bg-bg hover:text-text">Admin</a>}
           </nav>
           <div className="relative ml-auto">
@@ -72,6 +72,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   <div className="truncate font-medium">{user?.name || 'Bạn'}</div>
                   <div className="truncate text-xs text-muted">{user?.email}</div>
                 </div>
+                <Link to="/profile" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Hồ sơ</Link>
                 <Link to="/account" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm hover:bg-bg">Tài khoản</Link>
                 <button onClick={async () => { await logout(); navigate('/login'); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm text-warn hover:bg-warn-soft">Đăng xuất</button>
               </div>

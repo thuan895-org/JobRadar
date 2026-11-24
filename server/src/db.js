@@ -116,6 +116,8 @@ export async function initDb() {
       PRIMARY KEY (user_id, job_id)
     );
     CREATE INDEX IF NOT EXISTS user_jobs_status ON user_jobs(user_id, status);
+    -- When the user agreed to send their CV to the AI (separate from the terms).
+    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ai_consent_at TEXT;
 
     CREATE TABLE IF NOT EXISTS user_tokens (
       token_hash TEXT PRIMARY KEY,

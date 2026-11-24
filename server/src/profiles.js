@@ -40,7 +40,7 @@ const EMPTY = { skills: [], exclude_terms: [], answers: {}, summary: '', region_
 
 /** The profile without the CV bytes. */
 export async function getProfile(userId) {
-  const { rows } = await q(`SELECT user_id, skills, exclude_terms, answers, summary, region_only, min_budget_usd, cv_name, cv_mime, cv_text, cv_uploaded_at, updated_at
+  const { rows } = await q(`SELECT user_id, skills, exclude_terms, answers, summary, region_only, min_budget_usd, cv_name, cv_mime, cv_text, cv_uploaded_at, ai_consent_at, updated_at
     FROM user_profiles WHERE user_id = $1`, [userId]);
   return rows[0] ?? { ...EMPTY, user_id: userId };
 }
@@ -121,12 +121,53 @@ export function scoreRow(row, scoring) {
   }, scoring);
 }
 
-/** The text the AI reads about a user: what they wrote, plus their skills and CV text. */
+// ---- CV ----
+
+export async function saveCv(userId, { name, mime, data }) {
+  await q(`
+    INSERT INTO user_profiles (user_id, cv_name, cv_mime, cv_data, cv_uploaded_at, updated_at) VALUES ($1, $2, $3, $4, $5, $5)
+    ON CONFLICT (user_id) DO UPDATE SET cv_name = excluded.cv_name, cv_mime = excluded.cv_mime, cv_data = excluded.cv_data,
+      cv_text = NULL, cv_uploaded_at = excluded.cv_uploaded_at
+  `, [userId, name, mime, data, now()]);
+}
+
+export async function saveCvAnalysis(userId, cvText) {
+  await q('UPDATE user_profiles SET cv_text = $2, ai_consent_at = $3 WHERE user_id = $1', [userId, String(cvText ?? '').slice(0, 20000), now()]);
+}
+
+export async function getCv(userId) {
+  const { rows } = await q('SELECT cv_name, cv_mime, cv_data FROM user_profiles WHERE user_id = $1 AND cv_data IS NOT NULL', [userId]);
+  return rows[0] ?? null;
+}
+
+/** Forgets the CV file and the text read from it. */
+export async function clearCv(userId) {
+  await q('UPDATE user_profiles SET cv_name = NULL, cv_mime = NULL, cv_data = NULL, cv_text = NULL, cv_uploaded_at = NULL WHERE user_id = $1', [userId]);
+}
+
+/** Keeps only catalogue skills with a known level from what the AI suggested. */
+export function cleanDraftSkills(list) {
+  return (Array.isArray(list) ? list : []).filter((s) => BY_ID.has(s?.id)).map((s) => ({ id: s.id, level: LEVELS[s.level] ? s.level : 'good' }));
+}
+
+const ANSWER_TEXT = {
+  years: { '0-1': 'under 1 year', '1-3': '1-3 years', '3-5': '3-5 years', '5-10': '5-10 years', '10+': 'over 10 years' },
+  english: { basic: 'basic', reading: 'reads and writes well', conversational: 'conversational', fluent: 'fluent' },
+  workTypes: { project: 'fixed-price projects', hourly: 'hourly freelance', parttime: 'part-time remote', fulltime: 'full-time remote' },
+};
+
+/** The text the AI reads about a user: skills, quiz answers, what they wrote, and their CV text. */
 export function profileText(profile, user) {
   const skills = resolveSkills(profile).map((s) => `${s.label} (${s.weight >= LEVELS.main ? 'main skill' : s.weight >= LEVELS.good ? 'good' : 'some experience'})`);
+  const a = profile.answers ?? {};
   return [
     `Name: ${user.name || '(not given)'}`,
+    'Based in Vietnam (GMT+7).',
     skills.length ? `Skills: ${skills.join(', ')}` : '',
+    a.years ? `Experience: ${ANSWER_TEXT.years[a.years] ?? a.years}` : '',
+    a.english ? `English: ${ANSWER_TEXT.english[a.english] ?? a.english}` : '',
+    Array.isArray(a.workTypes) && a.workTypes.length ? `Looking for: ${a.workTypes.map((w) => ANSWER_TEXT.workTypes[w] ?? w).join(', ')}` : '',
+    a.hourlyRate ? `Expected rate: about $${a.hourlyRate}/hour` : '',
     profile.summary ? `About me:\n${profile.summary}` : '',
     profile.cv_text ? `CV:\n${profile.cv_text.slice(0, 12000)}` : '',
   ].filter(Boolean).join('\n\n');

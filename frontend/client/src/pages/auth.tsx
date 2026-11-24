@@ -80,7 +80,7 @@ export function Signup() {
       <GoogleButton label="Đăng ký với Google" />
       <form className="space-y-4" onSubmit={(e) => run(e, async () => {
         setUser((await api<{ user: User }>('/api/auth/signup', { body: { ...form, acceptTerms: accept } })).user);
-        navigate('/', { replace: true });
+        navigate('/onboarding', { replace: true });
       })}>
         {error && <Alert kind="error">{error}</Alert>}
         <Field label="Tên của bạn" autoComplete="name" required maxLength={100} value={form.name} onChange={set('name')} />

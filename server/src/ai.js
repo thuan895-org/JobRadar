@@ -39,7 +39,7 @@ export function readProfile() {
  * than retried, because the next model usually answers in seconds. If every
  * model fails, it pauses and goes round again, up to `rounds` times.
  */
-async function generateJson({ system, prompt, schema, temperature = 0.4, models, timeoutSeconds, rounds = 2 }) {
+async function generateJson({ system, prompt, files = [], schema, temperature = 0.4, models, timeoutSeconds, rounds = 2 }) {
   const { ai } = loadConfig();
   let last = 'no model configured';
   for (let round = 0; round < rounds; round++) {
@@ -50,7 +50,8 @@ async function generateJson({ system, prompt, schema, temperature = 0.4, models,
         headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          // files: [{ mimeType, data (base64) }], e.g. a CV as PDF, sent before the text.
+          contents: [{ role: 'user', parts: [...files.map((f) => ({ inlineData: { mimeType: f.mimeType, data: f.data } })), { text: prompt }] }],
           generationConfig: { temperature, responseMimeType: 'application/json', responseSchema: schema },
         }),
         signal: AbortSignal.timeout(timeoutSeconds * 1000),
@@ -216,4 +217,41 @@ export async function applyKit(job, profile = readProfile()) {
   const prompt = `PROFILE:\n${profile}\n\nJOB:\n${jobBrief(job, 8000)}\nURL: ${job.url}`;
   const { data, model } = await generateJson({ system: KIT_SYSTEM, prompt, schema: KIT_SCHEMA, temperature: 0.6, ...best() });
   return { ...data, model, created_at: new Date().toISOString() };
+}
+
+// ---- CV analysis: turns a PDF CV into a draft profile the user then checks ----
+
+const CV_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    is_cv: { type: 'BOOLEAN', description: 'false if the document is not a CV/resume' },
+    name: { type: 'STRING' },
+    headline: { type: 'STRING', description: 'one line, in English, e.g. "Backend developer, 5 years, Node.js and Java"' },
+    skills: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: { id: { type: 'STRING' }, level: { type: 'STRING', enum: ['main', 'good', 'some'] } },
+        required: ['id', 'level'],
+      },
+    },
+    extra_keywords: { type: 'ARRAY', items: { type: 'STRING' }, description: 'specific tools/technologies from the CV that should match job titles, lower case, at most 20' },
+    years: { type: 'STRING', enum: ['0-1', '1-3', '3-5', '5-10', '10+'] },
+    english: { type: 'STRING', enum: ['basic', 'reading', 'conversational', 'fluent'] },
+    intro_vi: { type: 'STRING', description: '2-4 sentences in Vietnamese, first person, about what the person does, using only facts from the CV' },
+    cv_text: { type: 'STRING', description: 'the CV as plain text, faithful, without contact details (phone, email, address, ID numbers)' },
+  },
+  required: ['is_cv', 'skills', 'extra_keywords', 'years', 'english', 'intro_vi', 'cv_text'],
+};
+
+const CV_SYSTEM = `You read a CV (resume) and fill in a job-matching profile for a Vietnamese freelancer.
+Use only facts written in the CV. Never invent employers, years, skills or results.
+Skills: choose ids only from the catalogue given. "main" = their core skill they have used most, "good" = solid experience, "some" = mentioned or minor.
+cv_text: copy the content as plain text, but leave out phone numbers, email addresses, street addresses, dates of birth and ID numbers.
+If the document is not a CV, set is_cv to false and leave the other fields empty.`;
+
+export async function analyzeCv(pdfBase64, catalog) {
+  const prompt = `SKILL CATALOGUE (id: label):\n${catalog.map((c) => `${c.id}: ${c.label}`).join('\n')}\n\nRead the attached CV and fill in the profile.`;
+  const { data } = await generateJson({ system: CV_SYSTEM, prompt, files: [{ mimeType: 'application/pdf', data: pdfBase64 }], schema: CV_SCHEMA, temperature: 0.1, ...best() });
+  return data;
 }

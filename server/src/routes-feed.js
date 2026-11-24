@@ -2,12 +2,24 @@
 // Every user sees the same jobs, scored and filtered by their own profile;
 // saving, hiding, AI scores and apply kits are kept per user in user_jobs.
 import { q, getJob, getMeta, setMeta } from './db.js';
-import { aiConfigured, scoreJobs, applyKit, prepareProfile } from './ai.js';
+import { aiConfigured, scoreJobs, applyKit, prepareProfile, analyzeCv } from './ai.js';
 import { highlightsFor } from './highlights.js';
-import { CATALOG, LEVELS, getProfile, saveProfile, scoringConfig, scoreRow, profileText, claimLegacyData } from './profiles.js';
+import { CATALOG, LEVELS, getProfile, saveProfile, scoringConfig, scoreRow, profileText, claimLegacyData, saveCv, saveCvAnalysis, getCv, clearCv, cleanDraftSkills } from './profiles.js';
 import { publicUser } from './accounts.js';
 import { requireUser, HttpError } from './routes-account.js';
-import { send, readJson } from './http.js';
+import { send, readJson, readBytes, limiter } from './http.js';
+
+const CV_MAX = 2 * 1048576;
+const cvAnalyses = limiter(5, 24 * 3600000); // AI reads of a CV per user per day
+
+/** Keeps letters, digits and a few safe characters from an uploaded file name. */
+function cleanFileName(header) {
+  let name = 'cv.pdf';
+  try {
+    name = decodeURIComponent(String(header ?? 'cv.pdf'));
+  } catch {}
+  return name.replace(/[^\p{L}\p{N}\p{Pd} ._()-]/gu, '').slice(0, 120) || 'cv.pdf';
+}
 
 const STATUSES = ['new', 'saved', 'applied', 'hidden'];
 const FEED_DAYS = 21; // jobs older than this only show if the user saved or applied to them
@@ -107,7 +119,7 @@ async function feed(user, params, config) {
 /** Handles /api/feed* and /api/profile. Returns false for anything else. */
 export async function handleFeedRoutes(req, res, url, ctx) {
   const path = url.pathname;
-  if (!(path === '/api/feed' || path.startsWith('/api/feed/') || path === '/api/profile')) return false;
+  if (!(path === '/api/feed' || path.startsWith('/api/feed/') || path === '/api/profile' || path.startsWith('/api/profile/'))) return false;
   try {
     await route(req, res, url, path, ctx);
   } catch (err) {
@@ -134,6 +146,40 @@ async function route(req, res, url, path, ctx) {
     } catch (err) {
       throw err.status ? err : new HttpError(400, err.message);
     }
+  }
+
+  if (req.method === 'POST' && path === '/api/profile/cv') {
+    // Raw PDF bytes; the file name comes in a header. Analysis by the AI only with the user's explicit consent.
+    if (!String(req.headers['content-type'] ?? '').startsWith('application/pdf')) throw new HttpError(415, 'Chỉ nhận CV dạng PDF.');
+    const data = await readBytes(req, CV_MAX);
+    if (data.subarray(0, 5).toString('latin1') !== '%PDF-') throw new HttpError(400, 'Tệp này không phải PDF.');
+    const name = cleanFileName(req.headers['x-file-name']);
+    await saveCv(user.id, { name, mime: 'application/pdf', data });
+    if (url.searchParams.get('analyze') !== '1') return send(res, 200, { profile: await getProfile(user.id), draft: null });
+    if (req.headers['x-ai-consent'] !== 'yes') throw new HttpError(400, 'Bạn cần đồng ý gửi CV cho AI để phân tích.');
+    if (!aiConfigured()) throw new HttpError(400, 'AI chưa được bật trên server. CV đã được lưu; bạn điền bảng hỏi giúp nhé.');
+    if (!cvAnalyses.hit(user.id)) throw new HttpError(429, 'Bạn đã phân tích CV 5 lần hôm nay. CV đã được lưu; thử lại vào ngày mai.');
+    const result = await analyzeCv(data.toString('base64'), CATALOG);
+    if (!result?.is_cv) throw new HttpError(400, 'Tệp này có vẻ không phải CV. Hãy tải lên CV của bạn hoặc điền bảng hỏi.');
+    await saveCvAnalysis(user.id, result.cv_text);
+    return send(res, 200, {
+      profile: await getProfile(user.id),
+      draft: {
+        skills: cleanDraftSkills(result.skills),
+        extraKeywords: (Array.isArray(result.extra_keywords) ? result.extra_keywords : []).map((k) => String(k).toLowerCase().trim()).filter(Boolean).slice(0, 20),
+        years: result.years, english: result.english, intro: String(result.intro_vi ?? '').slice(0, 2000), headline: result.headline ?? '',
+      },
+    });
+  }
+  if (req.method === 'GET' && path === '/api/profile/cv') {
+    const cv = await getCv(user.id);
+    if (!cv) throw new HttpError(404, 'Bạn chưa tải CV lên.');
+    res.writeHead(200, { 'Content-Type': cv.cv_mime, 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(cv.cv_name)}`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    return res.end(cv.cv_data);
+  }
+  if (req.method === 'POST' && path === '/api/profile/cv/remove') {
+    await clearCv(user.id);
+    return send(res, 200, { profile: await getProfile(user.id) });
   }
 
   if (req.method === 'GET' && path === '/api/feed') return send(res, 200, await feed(user, url.searchParams, ctx.config));
