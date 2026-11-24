@@ -162,6 +162,19 @@ export async function initDb() {
       output_tokens INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS ai_usage_at ON ai_usage(at);
+    -- Blog posts (Markdown), written in the admin app.
+    CREATE TABLE IF NOT EXISTS posts (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      excerpt TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft',
+      published_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      author_id TEXT REFERENCES users(id) ON DELETE SET NULL
+    );
     -- When the user agreed to send their CV to the AI (separate from the terms).
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ai_consent_at TEXT;
 

@@ -7,6 +7,8 @@ import { useSession } from '../session';
 import { VerifyBanner } from './home';
 import { KitDialog } from './kit';
 import { ReportDialog } from './report';
+import { AdCard, AdsConsent, useAds } from '../ads';
+import { Fragment } from 'react';
 
 type Status = 'new' | 'saved' | 'applied' | 'hidden';
 type Job = {
@@ -204,6 +206,7 @@ export function FeedPage() {
   const [shown, setShown] = useState(PAGE);
   const [kitJob, setKitJob] = useState<Job | null>(null);
   const [reportJob, setReportJob] = useState<Job | null>(null);
+  const ads = useAds();
 
   useEffect(() => { const t = setTimeout(() => setQuery(q.trim()), 300); return () => clearTimeout(t); }, [q]);
 
@@ -303,9 +306,12 @@ export function FeedPage() {
           </Card>
         )}
         <div className="space-y-3">
-          {jobs.slice(0, shown).map((job) => (
+          {jobs.slice(0, shown).map((job, i) => (
+            <Fragment key={job.id}>
+            {ads.show && i > 0 && i % 8 === 0 && <AdCard google={ads.google} />}
             <JobCard key={job.id} job={job} ai={Boolean(feed?.ai)} pro={Boolean(user?.proFeatures)} highlights={get(job)} onRetry={() => retry(job.id)} watch={watch}
               onStatus={(s) => setStatus(job, s)} onKit={() => setKitJob(job)} onAiScore={() => aiScore(job)} onReport={() => setReportJob(job)} />
+            </Fragment>
           ))}
         </div>
         {jobs.length > shown && (
@@ -318,6 +324,7 @@ export function FeedPage() {
           Dữ liệu từ Freelancer.com, Remotive, Remote OK, Himalayas, Jobicy và We Work Remotely. Mỗi job dẫn về trang gốc để bạn tự nộp đơn.
         </p>
       </div>
+      {ads.askConsent && <AdsConsent decide={ads.decide} />}
       <ReportDialog job={reportJob} onClose={() => setReportJob(null)} />
       <KitDialog job={kitJob} onClose={() => setKitJob(null)} onSaved={(id) => patch(id, { hasKit: true })} />
     </AppLayout>

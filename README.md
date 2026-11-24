@@ -16,7 +16,7 @@ npm start
 
 Trên Windows PowerShell, nếu báo "running scripts is disabled", dùng `npm.cmd install` và `npm.cmd start`.
 
-Sau đó mở http://localhost:4321. Server tự quét mỗi 60 phút (mỗi nguồn có giới hạn riêng trong `server/config.json` để không gọi API quá nhiều). Nút **Quét ngay** quét tất cả ngay lập tức.
+Sau đó mở http://localhost:4321 (landing page), http://localhost:4321/app/ (ứng dụng) hoặc http://localhost:4321/classic (trang một người dùng cũ). Server tự quét mỗi 60 phút (mỗi nguồn có giới hạn riêng trong `server/config.json` để không gọi API quá nhiều). Nút **Quét ngay** quét tất cả ngay lập tức.
 
 Chỉ quét một lần, không mở web: `npm run fetch`
 
@@ -48,6 +48,11 @@ Mỗi tài khoản có **hồ sơ riêng** (kỹ năng chọn từ danh mục ho
 - **Nguồn job:** lần gọi cuối, lỗi nếu có, số job lấy về, số job mới trong 24 giờ.
 - **Chi phí AI:** số lần gọi và token theo loại việc, theo model và theo người dùng (24 giờ / 7 ngày / 30 ngày). Muốn thấy tiền, điền giá vào `ai.pricing` trong `server/config.json`: `{"<model>": {"input": <USD/1 triệu token>, "output": <USD/1 triệu token>}}` theo bảng giá hiện tại của Google.
 - **Thanh toán:** lịch sử bật Pro; doanh thu thật không tính thanh toán thử nghiệm.
+
+**Trang công khai, blog và quảng cáo:**
+- `/` là landing page (render ở server để Google đọc được). Trang một người dùng cũ chuyển sang **`/classic`**, vẫn đăng nhập bằng `APP_PASSWORD`.
+- Blog: viết trong `/admin/` → Blog (Markdown, có xem trước, nháp/đăng, đường dẫn tự tạo từ tiêu đề). Bài đăng ở `/blog/<đường-dẫn>`, có trong `/sitemap.xml`. `robots.txt` chặn `/app/`, `/admin/`, `/api/`. Nội dung bài luôn được escape: không chèn được HTML hay script.
+- Quảng cáo: ô trên landing, blog, trong bài, và trong danh sách job của gói Free (cứ 8 job một ô). Gói Pro không có quảng cáo. Chưa đặt `ADSENSE_CLIENT` thì các ô hiện giới thiệu của JobRadar (gói Pro, channel). Có `ADSENSE_CLIENT` thì người xem thấy banner hỏi ý; script của Google **chỉ tải sau khi họ bấm Đồng ý**. `/ads.txt` được tạo tự động. Chính sách quyền riêng tư đã có mục quảng cáo, nên mọi người dùng được hỏi đồng ý lại điều khoản một lần.
 
 **Tạo hồ sơ (onboarding):** sau khi đăng ký, người dùng chọn một trong hai cách: trả lời bảng hỏi (lĩnh vực và mức độ, số năm kinh nghiệm, tiếng Anh, hình thức làm việc, mức giá, từ khoá thêm/loại trừ, giới thiệu ngắn), hoặc tải CV dạng PDF (tối đa 2 MB). Với CV, người dùng phải tích đồng ý gửi CV cho Gemini; AI đọc CV và điền sẵn bảng hỏi để người dùng kiểm tra rồi mới lưu. Mỗi người phân tích CV tối đa 5 lần/ngày. CV được lưu trong database; người dùng tải về hoặc xoá được trong trang Hồ sơ.
 
@@ -199,6 +204,9 @@ server/                    API, quét job, AI, Telegram (Node.js, Postgres)
   src/billing.js           gói Pro, thanh toán (thử nghiệm), lịch sử thanh toán
   src/telegram-users.js    liên kết Telegram theo người, báo job riêng, bản tin channel
   src/reports.js           báo cáo job, quyết định của admin, thống kê nguồn và mức dùng AI
+  src/public-pages.js      landing page, blog, sitemap, robots.txt, ads.txt, ô quảng cáo
+  src/blog.js              bài viết blog
+  src/markdown.js          chuyển Markdown thành HTML an toàn
   public/index.html        giao diện hiện tại (sẽ được thay bằng frontend/client)
   config.json              nguồn, kỹ năng, ngưỡng điểm, AI, Telegram
 frontend/

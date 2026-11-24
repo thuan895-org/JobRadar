@@ -5,7 +5,7 @@ import { DocLayout } from '../layouts';
 import { Link } from '../router';
 import { useSession } from '../session';
 
-const UPDATED = '24/11/2026';
+const UPDATED = '25/11/2026';
 
 function useOperator() {
   const { config } = useSession();
@@ -78,8 +78,8 @@ export function Privacy() {
       <h2>8. Bảo mật</h2>
       <p>Kết nối được mã hoá (HTTPS), mật khẩu được băm bằng thuật toán scrypt, phiên đăng nhập có thể bị thu hồi. Nếu xảy ra sự cố lộ lọt dữ liệu, chúng tôi sẽ thông báo cho bạn và cơ quan có thẩm quyền theo quy định.</p>
 
-      <h2>9. Cookie</h2>
-      <p>Chúng tôi chỉ dùng cookie cần thiết để giữ trạng thái đăng nhập. Không có cookie quảng cáo hay theo dõi. Nếu sau này có, chúng tôi sẽ cập nhật chính sách và hỏi ý bạn trước.</p>
+      <h2>9. Cookie và quảng cáo</h2>
+      <p>Chúng tôi dùng cookie cần thiết để giữ trạng thái đăng nhập. Gói Free, trang chủ và blog có thể hiển thị quảng cáo của <b>Google AdSense</b> để giữ dịch vụ miễn phí. Quảng cáo của Google <b>chỉ được tải sau khi bạn bấm "Đồng ý"</b> trên thông báo quảng cáo; khi đó Google có thể dùng cookie và địa chỉ IP để chọn và đo lường quảng cáo, theo chính sách của Google. Nếu bạn bấm "Không", chỉ có thông tin giới thiệu của JobRadar ở các vị trí đó. Lựa chọn được lưu trong trình duyệt của bạn; xoá dữ liệu trang web để chọn lại. Gói Pro không có quảng cáo. Chúng tôi không chia sẻ hồ sơ, CV hay danh sách job của bạn cho bên quảng cáo.</p>
 
       <h2>10. Độ tuổi</h2>
       <p>JobRadar dành cho người từ đủ 18 tuổi.</p>

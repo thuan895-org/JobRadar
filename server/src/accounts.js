@@ -9,7 +9,7 @@ import { q } from './db.js';
 const scrypt = promisify(scryptCb);
 
 /** Bump when the terms or privacy policy change: everyone is asked to accept again. */
-export const TERMS_VERSION = '2026-11-24';
+export const TERMS_VERSION = '2026-11-25';
 export const SESSION_DAYS = 30;
 export const MIN_PASSWORD = 8;
 export const TRIAL_DAYS = 7;

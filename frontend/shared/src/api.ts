@@ -27,6 +27,8 @@ export type PublicConfig = {
   priceVnd: number;
   billingMode: string;
   telegramChannel: string;
+  adsenseClient: string;
+  adsenseFeedSlot: string;
 };
 
 /** Days left until an ISO date, at least 0. */

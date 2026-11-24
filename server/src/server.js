@@ -13,6 +13,7 @@ import { handleFeedRoutes } from './routes-feed.js';
 import { highlightsFor } from './highlights.js';
 import { serveApp } from './static.js';
 import { linkChat } from './telegram-users.js';
+import { handlePublicPages } from './public-pages.js';
 
 loadEnv();
 const config = loadConfig();
@@ -139,6 +140,8 @@ const server = createServer(async (req, res) => {
     if (await handleAccountRoutes(req, res, url, { appUrl: appUrl(config), isLocal: !PUBLIC })) return;
     if (await handleFeedRoutes(req, res, url, { config })) return;
     if (await serveApp(req, res, url)) return;
+    // Landing page, blog, sitemap: public, rendered here for search engines.
+    if (await handlePublicPages(req, res, url, appUrl(config))) return;
 
     if (url.pathname === '/login') {
       if (req.method === 'GET') return send(res, 200, loginPage(), 'text/html; charset=utf-8');
@@ -151,7 +154,7 @@ const server = createServer(async (req, res) => {
         const password = new URLSearchParams(await readRaw(req)).get('password') ?? '';
         if (PASSWORD && sameText(password, PASSWORD)) {
           failures.delete(ip);
-          return send(res, 303, '', 'text/plain', { Location: '/', 'Set-Cookie': sessionCookie(req, newSession(), SESSION_DAYS * 86400) });
+          return send(res, 303, '', 'text/plain', { Location: '/classic', 'Set-Cookie': sessionCookie(req, newSession(), SESSION_DAYS * 86400) });
         }
         if (failures.size > 1000) for (const [k, v] of failures) if (v.until <= Date.now()) failures.delete(k);
         const n = f && f.until > Date.now() ? f.n + 1 : 1;
@@ -164,11 +167,11 @@ const server = createServer(async (req, res) => {
     }
 
     if (!loggedIn(req)) {
-      if (req.method === 'GET' && url.pathname === '/') return send(res, 303, '', 'text/plain', { Location: '/login' });
+      if (req.method === 'GET' && url.pathname === '/classic') return send(res, 303, '', 'text/plain', { Location: '/login' });
       return send(res, 401, { error: 'login required' });
     }
 
-    if (req.method === 'GET' && url.pathname === '/') {
+    if (req.method === 'GET' && url.pathname === '/classic') {
       return send(res, 200, readFileSync(join(ROOT, 'public', 'index.html'), 'utf8'), 'text/html; charset=utf-8');
     }
     if (req.method === 'GET' && url.pathname === '/api/jobs') {

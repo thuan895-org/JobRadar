@@ -14,6 +14,8 @@ import { telegramLink, unlinkChat, userTelegramSettings, saveUserTelegramSetting
 import { saveTelegramSettings as checkSettings } from './settings.js';
 import { PRO_PRICE_VND } from './accounts.js';
 import { listReports, resolveReport, sourceStats, aiUsageStats } from './reports.js';
+import { createPost, updatePost, removePost, listPosts, getPost } from './blog.js';
+import { renderMarkdown } from './markdown.js';
 
 const SESSION_COOKIE = 'jr_user';
 const OAUTH_COOKIE = 'jr_oauth';
@@ -159,6 +161,8 @@ async function route(req, res, url, path, ctx) {
       priceVnd: PRO_PRICE_VND,
       billingMode: billingMode(),
       telegramChannel: process.env.TELEGRAM_CHANNEL_URL || '',
+      adsenseClient: /^ca-pub-\d{10,20}$/.test(process.env.ADSENSE_CLIENT ?? '') ? process.env.ADSENSE_CLIENT : '',
+      adsenseFeedSlot: process.env.ADSENSE_SLOT_FEED || '',
     });
   }
 
@@ -355,6 +359,31 @@ async function route(req, res, url, path, ctx) {
       if (!['scam', 'verified', 'dismiss', 'unflag'].includes(action)) throw new HttpError(400, 'Hành động không hợp lệ.');
       if (!(await resolveReport(decodeURIComponent(resolve[1]), action, user.email))) throw new HttpError(404, 'Không tìm thấy báo cáo.');
       return send(res, 200, { ok: true });
+    }
+    if (method === 'GET' && path === '/api/admin/posts') {
+      return send(res, 200, { posts: await listPosts({ publishedOnly: false, limit: 500 }) });
+    }
+    if (method === 'POST' && path === '/api/admin/posts') {
+      return send(res, 201, { post: await createPost(await readJson(req), user.id) });
+    }
+    if (method === 'POST' && path === '/api/admin/blog/preview') {
+      const { body } = await readJson(req);
+      return send(res, 200, { html: renderMarkdown(String(body ?? '').slice(0, 100000)) });
+    }
+    const post = path.match(/^\/api\/admin\/posts\/([^/]+)(\/remove)?$/);
+    if (post) {
+      const id = decodeURIComponent(post[1]);
+      if (method === 'GET' && !post[2]) {
+        const p = await getPost({ id });
+        return p ? send(res, 200, { post: p }) : send(res, 404, { error: 'Không tìm thấy bài viết.' });
+      }
+      if (method === 'POST' && post[2]) {
+        return (await removePost(id)) ? send(res, 200, { ok: true }) : send(res, 404, { error: 'Không tìm thấy bài viết.' });
+      }
+      if (method === 'POST') {
+        const p = await updatePost(id, await readJson(req));
+        return p ? send(res, 200, { post: p }) : send(res, 404, { error: 'Không tìm thấy bài viết.' });
+      }
     }
     if (method === 'GET' && path === '/api/admin/sources') {
       return send(res, 200, { sources: await sourceStats() });

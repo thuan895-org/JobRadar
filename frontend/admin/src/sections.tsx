@@ -185,3 +185,89 @@ export function Payments() {
     </div>
   );
 }
+
+// ---- Blog ----
+
+type PostRow = { id: string; slug: string; title: string; excerpt: string; status: 'draft' | 'published'; published_at: string | null; updated_at: string };
+type Post = PostRow & { body: string };
+const EMPTY: Omit<Post, 'id' | 'published_at' | 'updated_at'> = { slug: '', title: '', excerpt: '', body: '', status: 'draft' };
+
+function Editor({ id, onDone }: { id: string | null; onDone: () => void }) {
+  const [post, setPost] = useState<typeof EMPTY | null>(id ? null : EMPTY);
+  const [preview, setPreview] = useState('');
+  const [tab, setTab] = useState<'write' | 'preview'>('write');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { if (id) api<{ post: Post }>(`/api/admin/posts/${encodeURIComponent(id)}`).then((r) => setPost(r.post)).catch((e) => setError(e.message)); }, [id]);
+  if (!post) return <Loading error={error} />;
+  const set = (patch: Partial<typeof EMPTY>) => setPost({ ...post, ...patch });
+  const save = async (status: 'draft' | 'published') => {
+    setBusy(true);
+    setError('');
+    try {
+      await api(id ? `/api/admin/posts/${encodeURIComponent(id)}` : '/api/admin/posts', { body: { ...post, status } });
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const field = 'w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] focus:border-brand focus:outline-none';
+  return (
+    <div className="space-y-4">
+      <button onClick={onDone} className="text-sm text-muted hover:text-text">← Danh sách bài viết</button>
+      {error && <Alert kind="error">{error}</Alert>}
+      <Card className="space-y-4">
+        <label className="block"><span className="mb-1 block text-sm font-medium">Tiêu đề</span><input className={field} value={post.title} onChange={(e) => set({ title: e.target.value })} placeholder="Cách nhận tiền từ Upwork về Việt Nam" /></label>
+        <label className="block"><span className="mb-1 block text-sm font-medium">Đường dẫn</span><input className={field} value={post.slug} onChange={(e) => set({ slug: e.target.value })} placeholder="để trống: tự tạo từ tiêu đề" /><span className="text-xs text-muted">/blog/{post.slug || 'tu-tieu-de'}</span></label>
+        <label className="block"><span className="mb-1 block text-sm font-medium">Mô tả ngắn (hiện trên Google và danh sách bài)</span><textarea className={field} rows={2} maxLength={300} value={post.excerpt} onChange={(e) => set({ excerpt: e.target.value })} placeholder="để trống: lấy đoạn đầu bài" /></label>
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            {(['write', 'preview'] as const).map((t) => (
+              <button key={t} onClick={async () => {
+                setTab(t);
+                if (t === 'preview') setPreview((await api<{ html: string }>('/api/admin/blog/preview', { body: { body: post.body } }).catch(() => ({ html: '' }))).html);
+              }} className={`rounded-full px-3 py-1 text-sm font-semibold ${tab === t ? 'bg-text text-bg' : 'text-muted'}`}>{t === 'write' ? 'Soạn' : 'Xem trước'}</button>
+            ))}
+            <span className="ml-auto text-xs text-muted">Markdown: ## tiêu đề, **đậm**, *nghiêng*, [link](https://…), - danh sách, &gt; trích dẫn</span>
+          </div>
+          {tab === 'write'
+            ? <textarea className={`${field} min-h-[420px] font-mono text-sm leading-relaxed`} value={post.body} onChange={(e) => set({ body: e.target.value })} />
+            // The server builds this HTML from escaped Markdown; it never contains raw HTML from the post.
+            : <div className="prose min-h-[420px] rounded-lg border border-line bg-bg p-5 text-[15px] leading-relaxed [&_a]:text-brand [&_a]:underline [&_blockquote]:border-l-3 [&_blockquote]:border-brand [&_blockquote]:pl-4 [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:mt-3 [&_ul]:list-disc" dangerouslySetInnerHTML={{ __html: preview }} />}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" busy={busy} onClick={() => save('published')}>{post.status === 'published' ? 'Cập nhật bài đã đăng' : 'Đăng bài'}</Button>
+          <Button busy={busy} onClick={() => save('draft')}>{post.status === 'published' ? 'Gỡ xuống thành nháp' : 'Lưu nháp'}</Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export function Blog() {
+  const [editing, setEditing] = useState<string | null | undefined>(undefined); // undefined = list, null = new post
+  const { data, error, reload } = useData<{ posts: PostRow[] }>('/api/admin/posts');
+  if (editing !== undefined) return <Editor id={editing} onDone={() => { setEditing(undefined); reload(); }} />;
+  if (!data) return <Loading error={error} />;
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between"><p className="text-sm text-muted">Bài đã đăng xuất hiện ở <a href="/blog" target="_blank" className="text-brand">/blog</a> và trong sitemap.</p><Button variant="primary" onClick={() => setEditing(null)}>Viết bài mới</Button></div>
+      <Table head={['Bài viết', 'Trạng thái', 'Đăng lúc', 'Sửa lúc', '']} empty={!data.posts.length}>
+        {data.posts.map((p) => (
+          <tr key={p.id}>
+            <td className="px-4 py-3"><button onClick={() => setEditing(p.id)} className="text-left font-medium hover:text-brand">{p.title}</button><div className="text-xs text-muted">/blog/{p.slug}</div></td>
+            <td className="px-4 py-3">{p.status === 'published' ? <span className="text-good">Đã đăng</span> : <span className="text-muted">Nháp</span>}</td>
+            <td className="px-4 py-3 text-muted">{fmt(p.published_at)}</td>
+            <td className="px-4 py-3 text-muted">{fmt(p.updated_at)}</td>
+            <td className="px-4 py-3 text-right whitespace-nowrap">
+              {p.status === 'published' && <a href={`/blog/${p.slug}`} target="_blank" rel="noopener" className="mr-3 text-sm text-brand">Xem ↗</a>}
+              <button onClick={async () => { if (confirm(`Xoá vĩnh viễn "${p.title}"?`)) { await api(`/api/admin/posts/${encodeURIComponent(p.id)}/remove`, { body: {} }); reload(); } }} className="text-sm text-warn">Xoá</button>
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </div>
+  );
+}
