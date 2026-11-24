@@ -2,18 +2,24 @@
   "name": "jobradar",
   "version": "1.0.0",
   "private": true,
-  "description": "Collects remote and freelance jobs from public APIs, scores them against your skills, shows them on a local web page and pings Telegram.",
-  "type": "module",
+  "description": "JobRadar: remote jobs for people in Vietnam. Server, user app and admin app in one repository.",
   "engines": {
-    "node": ">=22.5"
+    "node": ">=22.12"
   },
+  "workspaces": [
+    "server",
+    "frontend/shared",
+    "frontend/client",
+    "frontend/admin"
+  ],
   "scripts": {
-    "start": "node --disable-warning=ExperimentalWarning src/server.js",
-    "fetch": "node --disable-warning=ExperimentalWarning src/run.js",
-    "telegram:chatid": "node src/telegram-chatid.js",
-    "migrate": "node --disable-warning=ExperimentalWarning src/migrate-sqlite.js"
-  },
-  "dependencies": {
-    "pg": "^8.23.1"
+    "start": "node --disable-warning=ExperimentalWarning server/src/server.js",
+    "dev:server": "npm --workspace @jobradar/server run start",
+    "dev:client": "npm --workspace @jobradar/client run dev",
+    "dev:admin": "npm --workspace @jobradar/admin run dev",
+    "build": "npm --workspace @jobradar/client --workspace @jobradar/admin run build",
+    "fetch": "npm --workspace @jobradar/server run fetch",
+    "migrate": "npm --workspace @jobradar/server run migrate",
+    "telegram:chatid": "npm --workspace @jobradar/server run telegram:chatid"
   }
 }

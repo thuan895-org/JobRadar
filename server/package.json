@@ -1,0 +1,19 @@
+{
+  "name": "@jobradar/server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JobRadar API and job scanner: collects remote jobs from public APIs, scores them, AI summaries, Telegram alerts.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "fetch": "node --disable-warning=ExperimentalWarning src/run.js",
+    "telegram:chatid": "node src/telegram-chatid.js",
+    "migrate": "node --disable-warning=ExperimentalWarning src/migrate-sqlite.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}

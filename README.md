@@ -6,7 +6,7 @@ Cần Node.js 22.5 trở lên và một database Postgres (dùng [Neon](https://
 
 ## Chạy trên máy
 
-1. `cp .env.example .env`, dán connection string của Neon vào `DATABASE_URL=`. Nên tạo một branch `dev` trên Neon để dùng ở máy, tách khỏi dữ liệu thật.
+1. `cp server/.env.example server/.env`, dán connection string của Neon vào `DATABASE_URL=`. Nên tạo một branch `dev` trên Neon để dùng ở máy, tách khỏi dữ liệu thật.
 2. Cài thư viện và chạy:
 
 ```bash
@@ -16,19 +16,35 @@ npm start
 
 Trên Windows PowerShell, nếu báo "running scripts is disabled", dùng `npm.cmd install` và `npm.cmd start`.
 
-Sau đó mở http://localhost:4321. Server tự quét mỗi 60 phút (mỗi nguồn có giới hạn riêng trong `config.json` để không gọi API quá nhiều). Nút **Quét ngay** quét tất cả ngay lập tức.
+Sau đó mở http://localhost:4321. Server tự quét mỗi 60 phút (mỗi nguồn có giới hạn riêng trong `server/config.json` để không gọi API quá nhiều). Nút **Quét ngay** quét tất cả ngay lập tức.
 
 Chỉ quét một lần, không mở web: `npm run fetch`
+
+Các lệnh `npm ...` trong README đều chạy ở **thư mục gốc** của repo. File `.env`, `profile.md`, `server/config.json` và `data/` nằm trong thư mục `server/`.
+
+### Giao diện mới (đang làm)
+
+Ứng dụng cho người dùng và trang admin đang được xây dựng lại bằng React. Trong lúc đó, trang ở http://localhost:4321 vẫn là giao diện chính. Để chạy thử giao diện mới, mở thêm terminal (server vẫn phải chạy bằng `npm start`):
+
+```bash
+npm run dev:client
+```
+
+```bash
+npm run dev:admin
+```
+
+Client mở ở http://localhost:5173, admin ở http://localhost:5174/admin/. Chúng tự chuyển các lời gọi `/api` sang server ở cổng 4321. `npm run build` kiểm tra kiểu (TypeScript) và đóng gói cả hai.
 
 ## Bật Telegram
 
 1. Trong Telegram, nhắn cho **@BotFather** → `/newbot` → đặt tên → nhận **token**.
-2. `cp .env.example .env` rồi dán token vào dòng `TELEGRAM_BOT_TOKEN=`.
+2. `cp server/.env.example server/.env` (nếu chưa có) rồi dán token vào dòng `TELEGRAM_BOT_TOKEN=`.
 3. Mở bot vừa tạo trong Telegram, gửi cho nó một tin bất kỳ (ví dụ "hi").
 4. Chạy `npm run telegram:chatid`, rồi copy dòng `TELEGRAM_CHAT_ID=...` vào `.env`.
 5. Khởi động lại `npm start`.
 
-Mỗi lần quét, bot gửi tối đa 10 job có điểm ≥ 25, đăng trong 48 giờ gần nhất và nhận người ở Việt Nam, kèm một tin "…và còn N job" nếu còn dư. Mỗi job chỉ được gửi một lần. Nếu Telegram lỗi giữa chừng, job chưa gửi được sẽ thử lại ở lượt quét sau (miễn là chưa quá 48 giờ). Bạn chỉnh các ngưỡng này trong mục `telegram` của `config.json`.
+Mỗi lần quét, bot gửi tối đa 10 job có điểm ≥ 25, đăng trong 48 giờ gần nhất và nhận người ở Việt Nam, kèm một tin "…và còn N job" nếu còn dư. Mỗi job chỉ được gửi một lần. Nếu Telegram lỗi giữa chừng, job chưa gửi được sẽ thử lại ở lượt quét sau (miễn là chưa quá 48 giờ). Bạn chỉnh các ngưỡng này trong mục `telegram` của `server/config.json`.
 
 **Giờ nghỉ:** bấm **⚙️ Telegram** trên trang. Mặc định bot không gửi tin từ 00:00 đến 06:00 (giờ Việt Nam). Job phù hợp tìm được trong giờ nghỉ được giữ lại và gửi thành **một danh sách** ở lượt quét đầu tiên sau giờ nghỉ (với cron mỗi 60 phút: trong khoảng 06:00–07:00). Danh sách hiện tối đa 20 job, còn lại thì ghi số lượng. Bạn đổi giờ hoặc tắt giờ nghỉ ngay trong hộp đó; cài đặt được lưu trong database và tính theo múi giờ của trình duyệt lúc bạn bấm Lưu.
 
@@ -42,7 +58,7 @@ Mỗi lần quét, bot gửi tối đa 10 job có điểm ≥ 25, đăng trong 4
 
 1. Vào https://aistudio.google.com → **Get API key** → tạo key. Dùng project **không gắn thẻ thanh toán** để chắc chắn ở gói miễn phí.
 2. Dán key vào `.env` ở dòng `GEMINI_API_KEY=`.
-3. **Tạo và điền `profile.md`**: `cp profile.example.md profile.md`. File này không được đưa lên git vì chứa thông tin cá nhân. AI chỉ dùng thông tin trong file này để chấm job và viết proposal. Chỗ nào bạn chưa điền, AI để lại `[điền ...]` chứ không bịa.
+3. **Tạo và điền `profile.md`**: `cp server/profile.example.md server/profile.md`. File này không được đưa lên git vì chứa thông tin cá nhân. AI chỉ dùng thông tin trong file này để chấm job và viết proposal. Chỗ nào bạn chưa điền, AI để lại `[điền ...]` chứ không bịa.
 4. Khởi động lại `npm start`.
 
 AI làm gì:
@@ -50,7 +66,7 @@ AI làm gì:
 - **10 điểm chính**: khi bạn cuộn tới job nào, AI tóm tắt mô tả dài thành tối đa 10 gạch đầu dòng tiếng Việt, hiện ngay phía trên mô tả gốc (mô tả gốc vẫn giữ). Chỉ các job đang hiện trên màn hình mới được tóm tắt, tối đa 10 job/lần gọi; lướt nhanh qua thì không tốn lượt. Kết quả được lưu, lần sau hiện ngay.
 - **✍️ AI chuẩn bị apply** (nút trên mỗi job): viết proposal/cover letter, giá bid + thời gian giao, milestones, câu trả lời cho các câu hỏi thường gặp trong form, câu nên hỏi lại khách, điểm mạnh để đưa vào CV, và danh sách những gì bạn phải tự điền. Mỗi mục có nút Copy. Kết quả được lưu lại; bấm **Viết lại** để có bản khác.
 
-Đọc lại trước khi gửi: AI có thể sai. Ở gói miễn phí, Google có thể dùng nội dung gửi lên để cải thiện sản phẩm — đừng đưa thông tin nhạy cảm vào `profile.md`. Chỉnh model/giới hạn trong mục `ai` của `config.json`: `fastModels` dùng cho chấm điểm và 10 điểm chính (model nhanh trước), `models` dùng cho bộ apply (model tốt trước). Model nào quá tải hoặc quá chậm thì bỏ qua ngay và dùng model kế tiếp.
+Đọc lại trước khi gửi: AI có thể sai. Ở gói miễn phí, Google có thể dùng nội dung gửi lên để cải thiện sản phẩm — đừng đưa thông tin nhạy cảm vào `profile.md`. Chỉnh model/giới hạn trong mục `ai` của `server/config.json`: `fastModels` dùng cho chấm điểm và 10 điểm chính (model nhanh trước), `models` dùng cho bộ apply (model tốt trước). Model nào quá tải hoặc quá chậm thì bỏ qua ngay và dùng model kế tiếp.
 
 ## Nguồn dữ liệu
 
@@ -78,7 +94,7 @@ Server trên Render bản miễn phí sẽ **ngủ** sau khoảng 15 phút khôn
 1. Tạo **project mới** (hoặc ít nhất một database riêng), đừng dùng chung database với trang web khác.
 2. Vào **Connect**, chọn connection string loại **pooled**, copy lại để dùng cho `DATABASE_URL`.
 3. Bảng được tạo tự động khi server chạy lần đầu.
-4. Muốn mang dữ liệu cũ (kể cả kết quả AI) từ `data/jobs.sqlite` lên: đặt `DATABASE_URL` trong `.env` ở máy rồi chạy `npm run migrate`. Chạy lại nhiều lần cũng không bị trùng.
+4. Muốn mang dữ liệu cũ (kể cả kết quả AI) từ `server/data/jobs.sqlite` lên: đặt `DATABASE_URL` trong `.env` ở máy rồi chạy `npm run migrate`. Chạy lại nhiều lần cũng không bị trùng.
 
 ### 2. Render
 
@@ -106,15 +122,15 @@ Tạo chuỗi ngẫu nhiên: `node -e "console.log(require('crypto').randomBytes
 - Header: `Authorization: Bearer <CRON_SECRET>`. Dịch vụ cron nào không cho thêm header thì dùng `?key=<CRON_SECRET>` ở cuối URL.
 - Lịch: mỗi 60 phút.
 
-Endpoint trả lời ngay (`202`) rồi quét ở nền, nên cron không bị quá thời gian chờ. Hai lần gọi chồng nhau thì chỉ có một lượt quét. Mỗi nguồn vẫn giữ giới hạn riêng trong `config.json`.
+Endpoint trả lời ngay (`202`) rồi quét ở nền, nên cron không bị quá thời gian chờ. Hai lần gọi chồng nhau thì chỉ có một lượt quét. Mỗi nguồn vẫn giữ giới hạn riêng trong `server/config.json`.
 
 Lưu ý: số giờ chạy miễn phí của Render tính chung cho cả tài khoản. Nếu bạn còn web service miễn phí khác, đừng cài cron dày hơn mức cần để giữ server thức suốt ngày.
 
 ### Dọn dữ liệu
 
-Sau mỗi lượt quét, job ở tab Mới / Đã ẩn mà không nguồn nào còn đăng trong `retentionDays` ngày (mặc định 60, trong `config.json`) sẽ bị xoá để database không vượt gói miễn phí. Job đã **Lưu** hoặc **Đã nộp** được giữ lại cùng kết quả AI.
+Sau mỗi lượt quét, job ở tab Mới / Đã ẩn mà không nguồn nào còn đăng trong `retentionDays` ngày (mặc định 60, trong `server/config.json`) sẽ bị xoá để database không vượt gói miễn phí. Job đã **Lưu** hoặc **Đã nộp** được giữ lại cùng kết quả AI.
 
-## Chỉnh cho đúng ý bạn — `config.json`
+## Chỉnh cho đúng ý bạn — `server/config.json`
 
 - `skills`: nhóm kỹ năng, từ khoá và trọng số. Khớp ở tiêu đề được nhân 2, ở tag tính 1, chỉ trong mô tả thì tính nửa và cần ít nhất 2 từ khoá.
 - `excludeTitleTerms`: tiêu đề chứa các từ này bị trừ điểm mạnh.
@@ -126,13 +142,21 @@ Sau mỗi lượt quét, job ở tab Mới / Đã ẩn mà không nguồn nào c
 
 ## Cấu trúc
 
+Một repo, ba phần, quản lý bằng npm workspaces:
+
 ```
-src/sources.js   lấy job từ từng nguồn, chuẩn hoá về một dạng
-src/score.js     chấm điểm theo config.json
-src/settings.js  cài đặt đổi từ trang web (giờ nghỉ Telegram), lưu trong database
-src/db.js        lưu vào Postgres (Neon), kể cả kết quả AI theo id job
-src/run.js       một lượt quét + gửi Telegram
-src/server.js    trang web, đăng nhập, endpoint cho cron + lịch quét khi server thức
-src/migrate-sqlite.js  chép dữ liệu cũ từ data/jobs.sqlite sang Postgres
-public/index.html giao diện
+server/                    API, quét job, AI, Telegram (Node.js, Postgres)
+  src/sources.js           lấy job từ từng nguồn, chuẩn hoá về một dạng
+  src/score.js             chấm điểm theo config.json
+  src/settings.js          cài đặt đổi từ trang web (giờ nghỉ Telegram), lưu trong database
+  src/db.js                lưu vào Postgres (Neon), kể cả kết quả AI theo id job
+  src/run.js               một lượt quét + gửi Telegram
+  src/server.js            trang web, đăng nhập, endpoint cho cron + lịch quét khi server thức
+  src/migrate-sqlite.js    chép dữ liệu cũ từ data/jobs.sqlite sang Postgres
+  public/index.html        giao diện hiện tại (sẽ được thay bằng frontend/client)
+  config.json              nguồn, kỹ năng, ngưỡng điểm, AI, Telegram
+frontend/
+  shared/                  màu sắc (sáng/tối) và component dùng chung
+  client/                  ứng dụng cho người dùng (React + Vite + Tailwind)
+  admin/                   trang quản trị, chạy ở /admin/
 ```
