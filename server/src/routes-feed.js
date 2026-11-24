@@ -2,7 +2,8 @@
 // Every user sees the same jobs, scored and filtered by their own profile;
 // saving, hiding, AI scores and apply kits are kept per user in user_jobs.
 import { q, getJob, getMeta, setMeta } from './db.js';
-import { aiConfigured, scoreJobs, applyKit, prepareProfile, analyzeCv } from './ai.js';
+import { aiConfigured, scoreJobs, applyKit, prepareProfile, analyzeCv, aiContext } from './ai.js';
+import { addReport, REPORT_KINDS } from './reports.js';
 import { highlightsFor } from './highlights.js';
 import { CATALOG, LEVELS, getProfile, saveProfile, scoringConfig, scoreRow, profileText, claimLegacyData, saveCv, saveCvAnalysis, getCv, clearCv, cleanDraftSkills } from './profiles.js';
 import { publicUser, hasPro } from './accounts.js';
@@ -27,6 +28,7 @@ function freeAllowance(userId, jobId) {
 }
 const aiScores = limiter(200, 24 * 3600000); // fair use for trial/Pro
 const kits = limiter(40, 24 * 3600000);
+const reportsPerDay = limiter(20, 24 * 3600000);
 
 /** Keeps letters, digits and a few safe characters from an uploaded file name. */
 function cleanFileName(header) {
@@ -80,6 +82,7 @@ function feedItem(row, scored) {
     status: row.my_status ?? 'new',
     ai: row.ai_checked_at ? { score: row.ai_score, reason: row.ai_reason, flags: row.ai_flags ?? [], scam: row.ai_scam } : null,
     hasKit: Boolean(row.has_kit),
+    flag: row.flag ?? null,
     highlights: row.ai_highlights ?? null,
   };
 }
@@ -90,13 +93,14 @@ async function feed(user, params, config) {
   const cutoff = new Date(Date.now() - FEED_DAYS * 864e5).toISOString();
   const { rows } = await q(`
     SELECT j.id, j.source, j.title, j.company, j.url, LEFT(j.description, 6000) AS description, j.tags, j.kind, j.location,
-      j.budget_text, j.budget_min_usd, j.budget_max_usd, j.posted_at, j.bid_count, j.matched, j.first_seen, j.language, j.ai_highlights,
+      j.budget_text, j.budget_min_usd, j.budget_max_usd, j.posted_at, j.bid_count, j.matched, j.first_seen, j.language, j.ai_highlights, j.flag,
       uj.status AS my_status, uj.ai_score, uj.ai_reason, uj.ai_flags, uj.ai_scam, uj.ai_checked_at, (uj.apply_kit IS NOT NULL) AS has_kit
     FROM jobs j LEFT JOIN user_jobs uj ON uj.job_id = j.id AND uj.user_id = $1
     WHERE COALESCE(j.posted_at, j.first_seen) >= $2 OR uj.status IN ('saved', 'applied')
   `, [user.id, cutoff]);
 
-  const items = rows.map((r) => feedItem(r, scoreRow(r, scoring)));
+  // A job the admin marked as a scam disappears from New; if the user saved it, it stays there with a warning.
+  const items = rows.map((r) => feedItem(r, scoreRow(r, scoring))).filter((it) => !(it.flag === 'scam' && it.status === 'new'));
   const tab = STATUSES.includes(params.get('tab')) || params.get('tab') === 'all' ? params.get('tab') : 'new';
   const regionOnly = (params.get('regionOnly') ?? (profile.region_only ? '1' : '0')) === '1';
   // New jobs below 0 do not fit the profile at all; saved/applied/hidden ones always show.
@@ -154,6 +158,10 @@ export async function handleFeedRoutes(req, res, url, ctx) {
 
 async function route(req, res, url, path, ctx) {
   const user = await requireUser(req);
+  return aiContext.run({ userId: user.id }, () => routeFor(user, req, res, url, path, ctx));
+}
+
+async function routeFor(user, req, res, url, path, ctx) {
   if (publicUser(user).role === 'admin') await claimLegacyData(user, ctx.config, getMeta, setMeta);
 
   if (req.method === 'GET' && path === '/api/profile') {
@@ -223,7 +231,7 @@ async function route(req, res, url, path, ctx) {
     return send(res, 200, await highlightsFor([...new Set(ids.map(String))].slice(0, 10)));
   }
 
-  const m = path.match(/^\/api\/feed\/(.+)\/(status|ai-score|apply-kit)$/);
+  const m = path.match(/^\/api\/feed\/(.+)\/(status|ai-score|apply-kit|report)$/);
   if (req.method === 'POST' && m) {
     const id = decodeURIComponent(m[1]);
     const job = await getJob(id);
@@ -233,6 +241,13 @@ async function route(req, res, url, path, ctx) {
       if (!STATUSES.includes(status)) throw new HttpError(400, 'Trạng thái không hợp lệ.');
       await setUserJob(user.id, id, { status });
       return send(res, 200, { ok: true, status });
+    }
+    if (m[2] === 'report') {
+      const { kind, note } = await readJson(req);
+      if (!REPORT_KINDS.includes(kind)) throw new HttpError(400, 'Loại báo cáo không hợp lệ.');
+      if (!reportsPerDay.hit(user.id)) throw new HttpError(429, 'Bạn đã gửi 20 báo cáo hôm nay. Cảm ơn bạn, thử lại vào ngày mai.');
+      await addReport(user.id, id, kind, String(note ?? '').trim().slice(0, 1000));
+      return send(res, 200, { ok: true });
     }
     if (!aiConfigured()) throw new HttpError(400, 'AI chưa được bật trên server.');
     if (!hasPro(user)) throw new HttpError(402, 'pro_required');

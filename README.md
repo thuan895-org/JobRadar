@@ -43,6 +43,12 @@ Mỗi tài khoản có **hồ sơ riêng** (kỹ năng chọn từ danh mục ho
 
 **Telegram cho người dùng app:** trong mục Telegram, người dùng Pro bấm "Liên kết Telegram", mở bot và bấm Start (mã một lần, hiệu lực 15 phút, chỉ nhận trong chat riêng). Sau mỗi lượt quét, mỗi người nhận tối đa 5 job mới hợp hồ sơ của họ. Channel chung (`TELEGRAM_CHANNEL_ID`) nhận một bản tin mỗi ngày sau `CHANNEL_DIGEST_HOUR` giờ (giờ Việt Nam): tối đa 15 job nhận người Việt, chia theo lĩnh vực, kèm link đăng ký. Bot phải là admin của channel. Thông báo cũ qua `TELEGRAM_CHAT_ID` vẫn chạy cho tới khi bạn xoá biến đó.
 
+**Báo cáo job và trang admin:** mỗi job có nút "⚑ Báo cáo" (lừa đảo, hết hạn/link hỏng, sai thông tin, nhờ kiểm tra), tối đa 20 báo cáo/người/ngày. Trong `/admin/`:
+- **Báo cáo job:** đánh dấu *Lừa đảo* (job biến mất khỏi danh sách Mới, Telegram và channel của mọi người; ai đã lưu thì vẫn thấy kèm cảnh báo), *Đã xác minh* (job có huy hiệu ✓), hoặc *Bỏ qua*. Quyết định đóng mọi báo cáo đang mở của job đó.
+- **Nguồn job:** lần gọi cuối, lỗi nếu có, số job lấy về, số job mới trong 24 giờ.
+- **Chi phí AI:** số lần gọi và token theo loại việc, theo model và theo người dùng (24 giờ / 7 ngày / 30 ngày). Muốn thấy tiền, điền giá vào `ai.pricing` trong `server/config.json`: `{"<model>": {"input": <USD/1 triệu token>, "output": <USD/1 triệu token>}}` theo bảng giá hiện tại của Google.
+- **Thanh toán:** lịch sử bật Pro; doanh thu thật không tính thanh toán thử nghiệm.
+
 **Tạo hồ sơ (onboarding):** sau khi đăng ký, người dùng chọn một trong hai cách: trả lời bảng hỏi (lĩnh vực và mức độ, số năm kinh nghiệm, tiếng Anh, hình thức làm việc, mức giá, từ khoá thêm/loại trừ, giới thiệu ngắn), hoặc tải CV dạng PDF (tối đa 2 MB). Với CV, người dùng phải tích đồng ý gửi CV cho Gemini; AI đọc CV và điền sẵn bảng hỏi để người dùng kiểm tra rồi mới lưu. Mỗi người phân tích CV tối đa 5 lần/ngày. CV được lưu trong database; người dùng tải về hoặc xoá được trong trang Hồ sơ.
 
 Lần đầu một admin mở ứng dụng mới, dữ liệu của bản một người dùng được chuyển sang tài khoản đó: trạng thái job, điểm AI và bộ apply đã có, kỹ năng trong `server/config.json` và nội dung `profile.md`.
@@ -192,6 +198,7 @@ server/                    API, quét job, AI, Telegram (Node.js, Postgres)
   src/http.js              tiện ích HTTP dùng chung (cookie, JSON, giới hạn tần suất)
   src/billing.js           gói Pro, thanh toán (thử nghiệm), lịch sử thanh toán
   src/telegram-users.js    liên kết Telegram theo người, báo job riêng, bản tin channel
+  src/reports.js           báo cáo job, quyết định của admin, thống kê nguồn và mức dùng AI
   public/index.html        giao diện hiện tại (sẽ được thay bằng frontend/client)
   config.json              nguồn, kỹ năng, ngưỡng điểm, AI, Telegram
 frontend/

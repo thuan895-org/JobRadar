@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Card, Logo, Spinner, api, ApiError, daysLeft, type User } from '@jobradar/shared';
+import { AiUsage, Payments, Reports, Sources } from './sections';
 
 const PLAN = { trial: 'Dùng thử', pro: 'Pro', free: 'Free' } as const;
 
 const SECTIONS = [
   { id: 'users', label: 'Người dùng', ready: true },
-  { id: 'reports', label: 'Báo cáo job', ready: false },
-  { id: 'sources', label: 'Nguồn job', ready: false },
-  { id: 'ai', label: 'Chi phí AI', ready: false },
+  { id: 'reports', label: 'Báo cáo job', ready: true },
+  { id: 'sources', label: 'Nguồn job', ready: true },
+  { id: 'ai', label: 'Chi phí AI', ready: true },
+  { id: 'payments', label: 'Thanh toán', ready: true },
   { id: 'blog', label: 'Blog', ready: false },
 ];
+const PAGES: Record<string, () => React.JSX.Element> = { users: Users, reports: Reports, sources: Sources, ai: AiUsage, payments: Payments };
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 
@@ -134,7 +137,7 @@ export default function App() {
       </aside>
       <main className="p-4 sm:p-8">
         <h1 className="mb-6 text-2xl font-bold tracking-tight">{current.label}</h1>
-        {current.ready ? <Users /> : <Card><p className="text-muted">Phần này đang được xây dựng.</p></Card>}
+        {PAGES[section] ? (() => { const Page = PAGES[section]; return <Page />; })() : <Card><p className="text-muted">Phần này đang được xây dựng.</p></Card>}
       </main>
     </div>
   );

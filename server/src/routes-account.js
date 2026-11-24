@@ -13,6 +13,7 @@ import { addProDays, checkoutInfo, billingMode, listPayments, PRO_DAYS } from '.
 import { telegramLink, unlinkChat, userTelegramSettings, saveUserTelegramSettings } from './telegram-users.js';
 import { saveTelegramSettings as checkSettings } from './settings.js';
 import { PRO_PRICE_VND } from './accounts.js';
+import { listReports, resolveReport, sourceStats, aiUsageStats } from './reports.js';
 
 const SESSION_COOKIE = 'jr_user';
 const OAUTH_COOKIE = 'jr_oauth';
@@ -344,6 +345,22 @@ async function route(req, res, url, path, ctx) {
     if (publicUser(user).role !== 'admin') throw new HttpError(403, 'Chỉ admin mới xem được trang này.');
     if (method === 'GET' && path === '/api/admin/users') {
       return send(res, 200, { users: (await listUsers()).map(publicUser) });
+    }
+    if (method === 'GET' && path === '/api/admin/reports') {
+      return send(res, 200, { reports: await listReports(url.searchParams.get('status') ?? 'open') });
+    }
+    const resolve = path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
+    if (method === 'POST' && resolve) {
+      const { action } = await readJson(req);
+      if (!['scam', 'verified', 'dismiss', 'unflag'].includes(action)) throw new HttpError(400, 'Hành động không hợp lệ.');
+      if (!(await resolveReport(decodeURIComponent(resolve[1]), action, user.email))) throw new HttpError(404, 'Không tìm thấy báo cáo.');
+      return send(res, 200, { ok: true });
+    }
+    if (method === 'GET' && path === '/api/admin/sources') {
+      return send(res, 200, { sources: await sourceStats() });
+    }
+    if (method === 'GET' && path === '/api/admin/ai-usage') {
+      return send(res, 200, await aiUsageStats());
     }
     if (method === 'GET' && path === '/api/admin/payments') {
       return send(res, 200, { payments: await listPayments() });

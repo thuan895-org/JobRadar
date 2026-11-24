@@ -137,6 +137,31 @@ export async function initDb() {
       note TEXT,
       created_at TEXT NOT NULL
     );
+    -- Admin decisions on a job: 'scam' hides it everywhere, 'verified' shows a badge.
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS flag TEXT;
+    -- Users report a job (scam, expired, wrong details) or ask for it to be checked.
+    CREATE TABLE IF NOT EXISTS job_reports (
+      id TEXT PRIMARY KEY,
+      job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      kind TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      resolution TEXT,
+      created_at TEXT NOT NULL,
+      resolved_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS job_reports_status ON job_reports(status, created_at);
+    -- One row per Gemini answer: what it was for, which model, how many tokens.
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      at TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      model TEXT NOT NULL,
+      user_id TEXT,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS ai_usage_at ON ai_usage(at);
     -- When the user agreed to send their CV to the AI (separate from the terms).
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ai_consent_at TEXT;
 
@@ -257,7 +282,7 @@ export async function pendingNotifications({ minScore, maxAgeHours }) {
   const cutoff = new Date(Date.now() - maxAgeHours * 3.6e6).toISOString();
   const { rows } = await q(`
     SELECT * FROM jobs
-    WHERE NOT notified AND status = 'new' AND region_ok AND score >= $1
+    WHERE NOT notified AND status = 'new' AND region_ok AND score >= $1 AND flag IS DISTINCT FROM 'scam'
       AND COALESCE(posted_at, first_seen) >= $2
     ORDER BY score DESC
   `, [minScore, cutoff]);

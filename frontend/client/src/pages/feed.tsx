@@ -6,6 +6,7 @@ import { Link, navigate } from '../router';
 import { useSession } from '../session';
 import { VerifyBanner } from './home';
 import { KitDialog } from './kit';
+import { ReportDialog } from './report';
 
 type Status = 'new' | 'saved' | 'applied' | 'hidden';
 type Job = {
@@ -27,6 +28,7 @@ type Job = {
   status: Status;
   ai: { score: number; reason: string; flags: string[]; scam: 'low' | 'medium' | 'high' } | null;
   hasKit: boolean;
+  flag: 'scam' | 'verified' | null;
   highlights: string[] | null;
 };
 type Feed = { jobs: Job[]; total: number; counts: Record<Status | 'all', number>; sources: string[]; hasProfile: boolean; regionOnly: boolean; ai: boolean };
@@ -103,7 +105,7 @@ function ScoreBadge({ job }: { job: Job }) {
   );
 }
 
-function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, onAiScore }: {
+function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, onAiScore, onReport }: {
   job: Job;
   ai: boolean;
   pro: boolean;
@@ -113,6 +115,7 @@ function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, on
   onStatus: (s: Status) => void;
   onKit: () => void;
   onAiScore: () => Promise<void>;
+  onReport: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [scoring, setScoring] = useState(false);
@@ -128,8 +131,10 @@ function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, on
             {meta.map((m) => <span key={m}>{m}</span>)}
             {job.location && <span className={job.regionOk ? '' : 'text-warn'}>{job.regionOk ? '📍' : '⛔'} {job.location}</span>}
           </div>
-          {(job.matched.length > 0 || job.vietnameseClient || (job.ai && job.ai.scam !== 'low')) && (
+          {(job.matched.length > 0 || job.vietnameseClient || job.flag || (job.ai && job.ai.scam !== 'low')) && (
             <div className="mt-3 flex flex-wrap gap-1.5">
+              {job.flag === 'verified' && <span className="rounded-full bg-good-soft px-2.5 py-0.5 text-xs font-semibold text-good" title="Đội JobRadar đã kiểm tra job này">✓ Đã xác minh</span>}
+              {job.flag === 'scam' && <span className="rounded-full bg-warn px-2.5 py-0.5 text-xs font-semibold text-surface">⛔ Đã xác nhận lừa đảo</span>}
               {job.ai?.scam === 'high' && <span className="rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn">⚠️ Nghi lừa đảo</span>}
               {job.ai?.scam === 'medium' && <span className="rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn">⚠️ Cần cẩn thận</span>}
               {job.vietnameseClient && <span className="rounded-full bg-good-soft px-2.5 py-0.5 text-xs font-semibold text-good">🇻🇳 Khách Việt</span>}
@@ -175,7 +180,10 @@ function JobCard({ job, ai, pro, highlights, onRetry, watch, onStatus, onKit, on
         {job.status === 'saved' ? <Button onClick={() => onStatus('new')}>Bỏ lưu</Button> : <Button onClick={() => onStatus('saved')}>⭐ Lưu</Button>}
         {job.status !== 'applied' && <Button onClick={() => onStatus('applied')}>✅ Đã nộp</Button>}
         {job.status === 'hidden' ? <Button onClick={() => onStatus('new')}>Hiện lại</Button> : <Button onClick={() => onStatus('hidden')}>🙈 Ẩn</Button>}
-        <a href={job.url} target="_blank" rel="noopener noreferrer" className="ml-auto self-center text-sm font-semibold text-brand hover:underline">Mở job ↗</a>
+        <span className="ml-auto flex items-center gap-4 self-center">
+          <button onClick={onReport} className="text-sm text-muted hover:text-warn" title="Báo cáo job lừa đảo, hết hạn, sai thông tin, hoặc nhờ kiểm tra">⚑ Báo cáo</button>
+          <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand hover:underline">Mở job ↗</a>
+        </span>
       </div>
     </article>
   );
@@ -195,6 +203,7 @@ export function FeedPage() {
   const [error, setError] = useState('');
   const [shown, setShown] = useState(PAGE);
   const [kitJob, setKitJob] = useState<Job | null>(null);
+  const [reportJob, setReportJob] = useState<Job | null>(null);
 
   useEffect(() => { const t = setTimeout(() => setQuery(q.trim()), 300); return () => clearTimeout(t); }, [q]);
 
@@ -296,7 +305,7 @@ export function FeedPage() {
         <div className="space-y-3">
           {jobs.slice(0, shown).map((job) => (
             <JobCard key={job.id} job={job} ai={Boolean(feed?.ai)} pro={Boolean(user?.proFeatures)} highlights={get(job)} onRetry={() => retry(job.id)} watch={watch}
-              onStatus={(s) => setStatus(job, s)} onKit={() => setKitJob(job)} onAiScore={() => aiScore(job)} />
+              onStatus={(s) => setStatus(job, s)} onKit={() => setKitJob(job)} onAiScore={() => aiScore(job)} onReport={() => setReportJob(job)} />
           ))}
         </div>
         {jobs.length > shown && (
@@ -309,6 +318,7 @@ export function FeedPage() {
           Dữ liệu từ Freelancer.com, Remotive, Remote OK, Himalayas, Jobicy và We Work Remotely. Mỗi job dẫn về trang gốc để bạn tự nộp đơn.
         </p>
       </div>
+      <ReportDialog job={reportJob} onClose={() => setReportJob(null)} />
       <KitDialog job={kitJob} onClose={() => setKitJob(null)} onSaved={(id) => patch(id, { hasKit: true })} />
     </AppLayout>
   );

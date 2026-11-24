@@ -6,6 +6,20 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, loadConfig } from './util.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { q } from './db.js';
+
+/** Routes run AI calls inside aiContext.run({ userId }, fn) so usage is counted per user. */
+export const aiContext = new AsyncLocalStorage();
+
+async function logUsage(kind, model, usage) {
+  try {
+    await q('INSERT INTO ai_usage (at, kind, model, user_id, input_tokens, output_tokens) VALUES ($1, $2, $3, $4, $5, $6)',
+      [new Date().toISOString(), kind, model, aiContext.getStore()?.userId ?? null, usage?.promptTokenCount ?? 0, (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0)]);
+  } catch (err) {
+    console.error(`[ai] usage not logged: ${err.message}`);
+  }
+}
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,7 +53,7 @@ export function readProfile() {
  * than retried, because the next model usually answers in seconds. If every
  * model fails, it pauses and goes round again, up to `rounds` times.
  */
-async function generateJson({ system, prompt, files = [], schema, temperature = 0.4, models, timeoutSeconds, rounds = 2 }) {
+async function generateJson({ kind = 'other', system, prompt, files = [], schema, temperature = 0.4, models, timeoutSeconds, rounds = 2 }) {
   const { ai } = loadConfig();
   let last = 'no model configured';
   for (let round = 0; round < rounds; round++) {
@@ -59,6 +73,7 @@ async function generateJson({ system, prompt, files = [], schema, temperature = 
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
         const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+        await logUsage(kind, model, body.usageMetadata);
         try {
           return { data: JSON.parse(text), model };
         } catch {
@@ -124,7 +139,7 @@ Return one item per job, with the exact ID given.`;
 /** Scores up to ~10 jobs in one request. Returns [{ id, fit, reason_vi, red_flags_vi, scam_risk }]. */
 export async function scoreJobs(jobs, profile = readProfile()) {
   const prompt = `PROFILE:\n${profile}\n\nJOBS:\n\n${jobs.map((j) => jobBrief(j, 1800)).join('\n\n---\n\n')}`;
-  const { data } = await generateJson({ system: SCORE_SYSTEM, prompt, schema: SCORE_SCHEMA, temperature: 0.2, ...fast() });
+  const { data } = await generateJson({ kind: 'score', system: SCORE_SYSTEM, prompt, schema: SCORE_SCHEMA, temperature: 0.2, ...fast() });
   const ids = new Set(jobs.map((j) => j.id));
   return (Array.isArray(data) ? data : [])
     .filter((r) => ids.has(r.id))
@@ -149,7 +164,7 @@ Keep technology names, product names and numbers in their original form. Return 
 /** Up to 10 Vietnamese highlight points per job, several jobs per request. */
 export async function summarizeJobs(jobs) {
   const prompt = `JOBS:\n\n${jobs.map((j) => jobBrief(j, 5000)).join('\n\n---\n\n')}`;
-  const { data } = await generateJson({ system: HIGHLIGHTS_SYSTEM, prompt, schema: HIGHLIGHTS_SCHEMA, temperature: 0.2, ...fast(), rounds: 1 });
+  const { data } = await generateJson({ kind: 'highlights', system: HIGHLIGHTS_SYSTEM, prompt, schema: HIGHLIGHTS_SCHEMA, temperature: 0.2, ...fast(), rounds: 1 });
   const ids = new Set(jobs.map((j) => j.id));
   return (Array.isArray(data) ? data : [])
     .filter((r) => ids.has(r.id) && Array.isArray(r.points))
@@ -215,7 +230,7 @@ tips_vi: 2-4 short, practical tips for winning this specific job (and any red fl
 /** Writes the application kit for one job. */
 export async function applyKit(job, profile = readProfile()) {
   const prompt = `PROFILE:\n${profile}\n\nJOB:\n${jobBrief(job, 8000)}\nURL: ${job.url}`;
-  const { data, model } = await generateJson({ system: KIT_SYSTEM, prompt, schema: KIT_SCHEMA, temperature: 0.6, ...best() });
+  const { data, model } = await generateJson({ kind: 'kit', system: KIT_SYSTEM, prompt, schema: KIT_SCHEMA, temperature: 0.6, ...best() });
   return { ...data, model, created_at: new Date().toISOString() };
 }
 
@@ -252,6 +267,6 @@ If the document is not a CV, set is_cv to false and leave the other fields empty
 
 export async function analyzeCv(pdfBase64, catalog) {
   const prompt = `SKILL CATALOGUE (id: label):\n${catalog.map((c) => `${c.id}: ${c.label}`).join('\n')}\n\nRead the attached CV and fill in the profile.`;
-  const { data } = await generateJson({ system: CV_SYSTEM, prompt, files: [{ mimeType: 'application/pdf', data: pdfBase64 }], schema: CV_SCHEMA, temperature: 0.1, ...best() });
+  const { data } = await generateJson({ kind: 'cv', system: CV_SYSTEM, prompt, files: [{ mimeType: 'application/pdf', data: pdfBase64 }], schema: CV_SCHEMA, temperature: 0.1, ...best() });
   return data;
 }
