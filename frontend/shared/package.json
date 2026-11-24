@@ -1,0 +1,14 @@
+{
+  "name": "@jobradar/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Design tokens and UI components shared by the JobRadar user app and admin app.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

@@ -1,0 +1,62 @@
+/*
+ * JobRadar design tokens, shared by the user app and the admin app.
+ * Colors are CSS variables so dark mode only swaps the values; Tailwind
+ * exposes them as utilities (bg-surface, text-muted, border-line, ...).
+ */
+:root {
+  --jr-bg: #f6f7f9;
+  --jr-surface: #ffffff;
+  --jr-text: #1d2330;
+  --jr-muted: #677085;
+  --jr-line: #e3e6ec;
+  --jr-brand: #2f6fed;
+  --jr-brand-soft: #e8efff;
+  --jr-on-brand: #ffffff;
+  --jr-good: #1a8a52;
+  --jr-good-soft: #e3f5ea;
+  --jr-warn: #b26b00;
+  --jr-warn-soft: #fff3df;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --jr-bg: #12151b;
+    --jr-surface: #1a1e26;
+    --jr-text: #e6e9ef;
+    --jr-muted: #98a1b3;
+    --jr-line: #2a303b;
+    --jr-brand: #6d9bff;
+    --jr-brand-soft: #1e2a44;
+    --jr-on-brand: #0b1020;
+    --jr-good: #4cc98a;
+    --jr-good-soft: #17301f;
+    --jr-warn: #f0a640;
+    --jr-warn-soft: #33270f;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--jr-bg);
+  --color-surface: var(--jr-surface);
+  --color-text: var(--jr-text);
+  --color-muted: var(--jr-muted);
+  --color-line: var(--jr-line);
+  --color-brand: var(--jr-brand);
+  --color-brand-soft: var(--jr-brand-soft);
+  --color-on-brand: var(--jr-on-brand);
+  --color-good: var(--jr-good);
+  --color-good-soft: var(--jr-good-soft);
+  --color-warn: var(--jr-warn);
+  --color-warn-soft: var(--jr-warn-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html,
+body {
+  background: var(--jr-bg);
+  color: var(--jr-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
