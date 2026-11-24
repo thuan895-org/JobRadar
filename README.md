@@ -22,9 +22,16 @@ Chỉ quét một lần, không mở web: `npm run fetch`
 
 Các lệnh `npm ...` trong README đều chạy ở **thư mục gốc** của repo. File `.env`, `profile.md`, `server/config.json` và `data/` nằm trong thư mục `server/`.
 
-### Giao diện mới (đang làm)
+### Ứng dụng mới: tài khoản người dùng và admin
 
-Ứng dụng cho người dùng và trang admin đang được xây dựng lại bằng React. Trong lúc đó, trang ở http://localhost:4321 vẫn là giao diện chính. Để chạy thử giao diện mới, mở thêm terminal (server vẫn phải chạy bằng `npm start`):
+Ứng dụng mới chạy song song với trang cũ:
+
+- **http://localhost:4321/app/**: đăng ký bằng email/mật khẩu hoặc Google, xác minh email, quên mật khẩu, đồng ý điều khoản, trang Tài khoản (đổi tên, mật khẩu, tải dữ liệu, xoá tài khoản), Điều khoản và Chính sách quyền riêng tư.
+- **http://localhost:4321/admin/**: danh sách người dùng. Chỉ email có trong `ADMIN_EMAILS` vào được.
+
+Trang cũ ở `/` vẫn dùng `APP_PASSWORD` như trước cho tới khi ứng dụng mới có đủ tính năng.
+
+Server phục vụ bản đã build của hai ứng dụng, nên chạy `npm run build` một lần (và sau mỗi lần sửa giao diện). Khi đang sửa giao diện, chạy thêm các lệnh sau trong terminal khác để trang tự cập nhật (server vẫn chạy bằng `npm start`):
 
 ```bash
 npm run dev:client
@@ -34,7 +41,13 @@ npm run dev:client
 npm run dev:admin
 ```
 
-Client mở ở http://localhost:5173, admin ở http://localhost:5174/admin/. Chúng tự chuyển các lời gọi `/api` sang server ở cổng 4321. `npm run build` kiểm tra kiểu (TypeScript) và đóng gói cả hai.
+Client mở ở http://localhost:5173/app/, admin ở http://localhost:5174/admin/. Chúng tự chuyển các lời gọi `/api` sang server ở cổng 4321.
+
+Các biến môi trường mới (xem `server/.env.example`): `ADMIN_EMAILS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `LEGAL_OPERATOR`, `CONTACT_EMAIL`. Thiếu Google thì nút Google bị ẩn; thiếu Resend thì không gửi email (chạy trên máy thì liên kết được in ra log).
+
+**Đăng nhập Google:** trong Google Cloud Console → APIs & Services → Credentials, tạo OAuth client loại *Web application*, thêm Authorized redirect URI `<PUBLIC_URL>/api/auth/google/callback` (trên máy: `http://localhost:4321/api/auth/google/callback`). Màn hình đồng ý OAuth chỉ cần các quyền `openid`, `email`, `profile`.
+
+**Điều khoản và chính sách** được viết theo Luật Bảo vệ dữ liệu cá nhân của Việt Nam, nhưng nên nhờ người có chuyên môn pháp lý đọc lại trước khi thu tiền. Khi sửa nội dung, tăng `TERMS_VERSION` trong `server/src/accounts.js`: mọi người dùng sẽ được hỏi đồng ý lại.
 
 ## Bật Telegram
 
@@ -99,7 +112,7 @@ Server trên Render bản miễn phí sẽ **ngủ** sau khoảng 15 phút khôn
 ### 2. Render
 
 1. **New → Web Service**, chọn repo này.
-2. Build command: `npm install`. Start command: `npm start`. Instance type: Free.
+2. Build command: `npm ci && npm run build` (build cả ứng dụng người dùng và admin). Start command: `npm start`. Instance type: Free.
 3. Phần **Environment**, thêm các biến:
 
 | Biến | Giá trị |
@@ -153,10 +166,14 @@ server/                    API, quét job, AI, Telegram (Node.js, Postgres)
   src/run.js               một lượt quét + gửi Telegram
   src/server.js            trang web, đăng nhập, endpoint cho cron + lịch quét khi server thức
   src/migrate-sqlite.js    chép dữ liệu cũ từ data/jobs.sqlite sang Postgres
+  src/accounts.js          tài khoản: mật khẩu (scrypt), phiên đăng nhập, liên kết gửi qua email
+  src/routes-account.js    API đăng ký, đăng nhập, Google, đồng ý điều khoản, dữ liệu của tôi, admin
+  src/email.js             gửi email tài khoản qua Resend
+  src/static.js            phục vụ bản build của client (/app/) và admin (/admin/)
   public/index.html        giao diện hiện tại (sẽ được thay bằng frontend/client)
   config.json              nguồn, kỹ năng, ngưỡng điểm, AI, Telegram
 frontend/
   shared/                  màu sắc (sáng/tối) và component dùng chung
-  client/                  ứng dụng cho người dùng (React + Vite + Tailwind)
+  client/                  ứng dụng cho người dùng, chạy ở /app/ (React + Vite + Tailwind)
   admin/                   trang quản trị, chạy ở /admin/
 ```

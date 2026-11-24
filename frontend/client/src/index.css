@@ -3,3 +3,13 @@
 
 /* Shared components live outside this app: let Tailwind see their classes. */
 @source "../../shared/src";
+
+/* Long-form pages (terms, privacy). */
+.doc h1 { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.02em; }
+.doc h2 { font-size: 1.125rem; font-weight: 600; margin-top: 2rem; }
+.doc p, .doc li { line-height: 1.7; color: var(--jr-text); }
+.doc p { margin-top: 0.75rem; }
+.doc ul { margin-top: 0.75rem; padding-left: 1.25rem; list-style: disc; }
+.doc li { margin-top: 0.4rem; }
+.doc a { color: var(--jr-brand); text-decoration: underline; }
+.doc .updated { color: var(--jr-muted); font-size: 0.875rem; margin-top: 0.25rem; }

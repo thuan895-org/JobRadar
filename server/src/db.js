@@ -19,7 +19,7 @@ export const pool = new pg.Pool({
 });
 pool.on('error', (err) => console.error(`[db] idle connection error: ${err.message}`));
 
-const q = (text, params) => pool.query(text, params);
+export const q = (text, params) => pool.query(text, params);
 
 export async function initDb() {
   await q(`
@@ -56,6 +56,37 @@ export async function initDb() {
     CREATE INDEX IF NOT EXISTS jobs_score ON jobs(score);
     CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value JSONB);
+
+    -- Accounts. A user signs up with email + password, with Google, or both.
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL DEFAULT '',
+      password_hash TEXT,
+      google_sub TEXT UNIQUE,
+      role TEXT NOT NULL DEFAULT 'user',
+      email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+      terms_version TEXT,
+      terms_accepted_at TEXT,
+      created_at TEXT NOT NULL,
+      last_login_at TEXT
+    );
+    -- Login sessions: the browser keeps a random token, we keep only its hash.
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+    -- One-time links sent by email (verify the address, reset the password).
+    CREATE TABLE IF NOT EXISTS user_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT
+    );
   `);
 }
 

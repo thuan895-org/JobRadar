@@ -8,6 +8,8 @@ import { runOnce, aiScoreOne, scanRunning, appUrl, telegramQueue } from './run.j
 import { getTelegramSettings, saveTelegramSettings, inQuietHours, localTime } from './settings.js';
 import { telegramConfigured, sendTelegram, formatJob, explainTelegramError, webhookSecret, setupWebhook, handleUpdate } from './telegram.js';
 import { aiConfigured, applyKit, summarizeJobs } from './ai.js';
+import { handleAccountRoutes } from './routes-account.js';
+import { serveApp } from './static.js';
 
 loadEnv();
 const config = loadConfig();
@@ -161,6 +163,10 @@ const server = createServer(async (req, res) => {
       // Always 200: otherwise Telegram keeps resending the same message.
       return send(res, 200, { ok: true });
     }
+
+    // Accounts (new apps) and the built apps themselves: they have their own login.
+    if (await handleAccountRoutes(req, res, url, { appUrl: appUrl(config), isLocal: !PUBLIC })) return;
+    if (await serveApp(req, res, url)) return;
 
     if (url.pathname === '/login') {
       if (req.method === 'GET') return send(res, 200, loginPage(), 'text/html; charset=utf-8');
