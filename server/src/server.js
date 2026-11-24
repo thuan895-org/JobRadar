@@ -305,6 +305,12 @@ server.listen(PORT, HOST, () => {
   console.log(`Telegram: ${telegramConfigured() ? 'on' : 'off (fill in .env to turn it on)'}`);
   setupWebhook(appUrl(config)).then((state) => console.log(`Telegram /start replies: ${state}`));
   console.log(`Gemini AI: ${aiConfigured() ? 'on' : 'off (add GEMINI_API_KEY to .env to turn it on)'}`);
+  // Names only, never values: says which setting is missing when a feature is off.
+  const missing = (keys) => keys.filter((k) => !process.env[k]?.trim());
+  const status = (keys) => (missing(keys).length ? `off (empty or missing: ${missing(keys).join(', ')})` : 'on');
+  console.log(`Google sign-in: ${status(['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'])}`);
+  console.log(`Account emails: ${status(['RESEND_API_KEY', 'EMAIL_FROM'])}`);
+  console.log(`Admins: ${process.env.ADMIN_EMAILS?.trim() ? 'set' : 'none (set ADMIN_EMAILS)'}`);
 });
 
 // Scans while the server is awake. On Render's free plan the server sleeps when
