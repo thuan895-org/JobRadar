@@ -41,7 +41,7 @@ export class ApiError extends Error {
 }
 
 /** JSON in, JSON out. Throws ApiError with the server's (Vietnamese) message. */
-export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+export async function api<T>(path: string, options: { method?: string; body?: unknown; timeoutMs?: number } = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -49,8 +49,10 @@ export async function api<T>(path: string, options: { method?: string; body?: un
       headers: options.body === undefined ? {} : { 'Content-Type': 'application/json' },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       credentials: 'same-origin',
+      signal: AbortSignal.timeout(options.timeoutMs ?? 90000),
     });
-  } catch {
+  } catch (err) {
+    if ((err as Error).name === 'TimeoutError') throw new ApiError(0, 'Server phản hồi quá chậm. Thử lại sau ít phút (máy chủ có thể đang khởi động).');
     throw new ApiError(0, 'Không kết nối được server. Kiểm tra mạng rồi thử lại.');
   }
   const data = await res.json().catch(() => ({}));

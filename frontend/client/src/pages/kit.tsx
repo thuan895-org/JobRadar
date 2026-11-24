@@ -56,7 +56,7 @@ export function KitDialog({ job, onClose, onSaved }: { job: { id: string; title:
     setBusy(true);
     setError('');
     try {
-      const r = await api<{ kit: Kit }>(`/api/feed/${encodeURIComponent(job.id)}/apply-kit`, { body: { regenerate } });
+      const r = await api<{ kit: Kit }>(`/api/feed/${encodeURIComponent(job.id)}/apply-kit`, { body: { regenerate }, timeoutMs: 150000 });
       setKit(r.kit);
       onSaved(job.id);
     } catch (err) {

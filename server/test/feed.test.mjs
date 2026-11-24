@@ -49,6 +49,13 @@ await des('POST', '/api/profile', { skills: [{ id: 'graphic', level: 'main' }], 
 r = await des('POST', '/api/profile', { skills: 'not a list' });
 check('bad profile input refused with a message', r.status === 400 && r.data.error);
 
+r = await des('GET', '/api/feed?q=illustrator');
+check('search also looks inside descriptions (in the database)', ids(r).includes('t3') && !ids(r).includes('t2'), ids(r).join(','));
+r = await des('GET', '/api/feed?q=100%25');
+check('a % in the search is taken literally', r.status === 200 && r.data.jobs.length === 0);
+r = await des('GET', '/api/feed');
+check('the shown jobs carry their description', r.data.jobs.find((j) => j.id === 't3')?.description.includes('Photoshop'));
+
 console.log('\n== Per-user state ==');
 r = await des('POST', '/api/feed/t3/status', { status: 'saved' });
 check('she saves the design job', r.status === 200);

@@ -87,21 +87,53 @@ function feedItem(row, scored) {
   };
 }
 
+// Scores depend only on the job and the user's profile, so they are kept per
+// user until the profile changes (or the server restarts). Opening another tab
+// or changing a filter then costs no scoring at all, and job descriptions are
+// read from the database only for jobs not scored yet and for the jobs shown.
+const scoreCache = new Map(); // userId -> { version, scores: Map(jobId -> { score, matched, regionOk }) }
+const SCORE_CACHE_USERS = 300;
+
+function scoresFor(user, profile) {
+  const version = `${profile.updated_at ?? ''}`;
+  let entry = scoreCache.get(user.id);
+  if (!entry || entry.version !== version) {
+    entry = { version, scores: new Map() };
+    if (scoreCache.size >= SCORE_CACHE_USERS) scoreCache.delete(scoreCache.keys().next().value);
+  }
+  scoreCache.delete(user.id); // re-insert: most recently used last
+  scoreCache.set(user.id, entry);
+  return entry.scores;
+}
+
+async function descriptions(ids, length) {
+  if (!ids.length) return new Map();
+  const { rows } = await q(`SELECT id, LEFT(description, ${length}) AS description FROM jobs WHERE id = ANY($1)`, [ids]);
+  return new Map(rows.map((r) => [r.id, r.description ?? '']));
+}
+
 async function feed(user, params, config) {
   const profile = await getProfile(user.id);
   const scoring = scoringConfig(profile, config);
   const cutoff = new Date(Date.now() - FEED_DAYS * 864e5).toISOString();
+  // Text search runs in the database, over the full description too.
+  const searchText = (params.get('q') ?? '').trim().slice(0, 100);
   const { rows } = await q(`
-    SELECT j.id, j.source, j.title, j.company, j.url, LEFT(j.description, 6000) AS description, j.tags, j.kind, j.location,
+    SELECT j.id, j.source, j.title, j.company, j.url, j.tags, j.kind, j.location,
       j.budget_text, j.budget_min_usd, j.budget_max_usd, j.posted_at, j.bid_count, j.matched, j.first_seen, j.language, j.ai_highlights, j.flag,
       uj.status AS my_status, uj.ai_score, uj.ai_reason, uj.ai_flags, uj.ai_scam, uj.ai_checked_at, (uj.apply_kit IS NOT NULL) AS has_kit
     FROM jobs j LEFT JOIN user_jobs uj ON uj.job_id = j.id AND uj.user_id = $1
-    WHERE COALESCE(j.posted_at, j.first_seen) >= $2 OR uj.status IN ('saved', 'applied')
-  `, [user.id, cutoff]);
+    WHERE (COALESCE(j.posted_at, j.first_seen) >= $2 OR uj.status IN ('saved', 'applied'))
+      AND ($3 = '' OR j.title ILIKE $4 OR j.company ILIKE $4 OR j.description ILIKE $4)
+  `, [user.id, cutoff, searchText, `%${searchText.replace(/[\\%_]/g, (c) => `\\${c}`)}%`]);
 
   // A job the admin marked as a scam disappears from New; if the user saved it, it stays there with a warning.
   // Scam or closed jobs leave New; anyone who saved or applied keeps them, with a mark.
-  const items = rows.map((r) => feedItem(r, scoreRow(r, scoring))).filter((it) => !((it.flag === 'scam' || it.flag === 'closed') && it.status === 'new'));
+  const scores = scoresFor(user, profile);
+  const unscored = rows.filter((r) => !scores.has(r.id));
+  const texts = await descriptions(unscored.map((r) => r.id), 6000);
+  for (const r of unscored) scores.set(r.id, scoreRow({ ...r, description: texts.get(r.id) ?? '' }, scoring));
+  const items = rows.map((r) => feedItem(r, scores.get(r.id))).filter((it) => !((it.flag === 'scam' || it.flag === 'closed') && it.status === 'new'));
   const tab = STATUSES.includes(params.get('tab')) || params.get('tab') === 'all' ? params.get('tab') : 'new';
   const regionOnly = (params.get('regionOnly') ?? (profile.region_only ? '1' : '0')) === '1';
   // New jobs below 0 do not fit the profile at all; saved/applied/hidden ones always show.
@@ -116,13 +148,11 @@ async function feed(user, params, config) {
     counts.all++;
   }
   const source = params.get('source') ?? '';
-  const text = (params.get('q') ?? '').trim().toLowerCase().slice(0, 100);
   const shown = items.filter((it) =>
     (tab === 'all' || it.status === tab)
     && (!regionOnly || it.regionOk || it.status !== 'new') // the region filter is for discovering; saved/applied jobs always show
     && it.score >= minScore
-    && (!source || it.source === source)
-    && (!text || `${it.title} ${it.company} ${it.description}`.toLowerCase().includes(text)));
+    && (!source || it.source === source));
 
   const sort = params.get('sort') ?? 'fit';
   const date = (it) => Date.parse(it.postedAt) || 0;
@@ -130,8 +160,11 @@ async function feed(user, params, config) {
     : sort === 'score' ? (a, b) => b.score - a.score || date(b) - date(a)
     : (a, b) => (b.ai?.score ?? -1) - (a.ai?.score ?? -1) || b.score - a.score || date(b) - date(a));
 
+  const page = shown.slice(0, FEED_LIMIT);
+  const shownTexts = await descriptions(page.map((it) => it.id), 3000);
+  for (const it of page) it.description = shownTexts.get(it.id) ?? '';
   return {
-    jobs: shown.slice(0, FEED_LIMIT),
+    jobs: page,
     total: shown.length,
     counts,
     sources: [...new Set(items.map((it) => it.source))].sort(),

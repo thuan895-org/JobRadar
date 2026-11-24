@@ -7,6 +7,14 @@ function re(term) {
   return termRe.get(term);
 }
 
+// A plain substring search on lower-cased text is far cheaper than a Unicode
+// regex, so it decides which words could be there; only those get the
+// whole-word regex check. Results are the same as testing every word.
+function hits(terms, text, lower) {
+  if (!text || !terms.length) return [];
+  return terms.filter((t) => lower.includes(t.toLowerCase()) && re(t).test(text));
+}
+
 export function regionOk(location, config) {
   const loc = (location || '').toLowerCase().trim();
   if (!loc) return true;
@@ -19,14 +27,17 @@ export function scoreJob(job, config) {
   const title = job.title || '';
   const tags = (job.tags || []).join(' | ');
   const desc = (job.description || '').slice(0, 6000);
+  const lowTitle = title.toLowerCase();
+  const lowTags = tags.toLowerCase();
+  const lowDesc = desc.toLowerCase();
   let score = 0;
   const matched = [];
 
   for (const skill of config.skills) {
-    if (skill.requireAny && !skill.requireAny.some((t) => re(t).test(title) || re(t).test(tags) || re(t).test(desc))) continue;
-    const inTitle = skill.terms.filter((t) => re(t).test(title));
-    const inTags = skill.terms.filter((t) => re(t).test(tags));
-    const inDesc = skill.terms.filter((t) => re(t).test(desc));
+    if (skill.requireAny && !hits(skill.requireAny, title, lowTitle).length && !hits(skill.requireAny, tags, lowTags).length && !hits(skill.requireAny, desc, lowDesc).length) continue;
+    const inTitle = hits(skill.terms, title, lowTitle);
+    const inTags = hits(skill.terms, tags, lowTags);
+    const inDesc = hits(skill.terms, desc, lowDesc);
     // Long descriptions mention everything, so they count least and need two hits.
     if (inTitle.length) score += skill.weight * 2;
     else if (inTags.length) score += skill.weight;
