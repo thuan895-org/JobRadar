@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { ROOT, loadConfig, loadEnv } from './util.js';
-import { initDb, listJobs, setStatus, counts, getMeta, getJob, saveApplyKit, saveHighlights } from './db.js';
+import { initDb, listJobs, setStatus, counts, getMeta, getJob, saveApplyKit } from './db.js';
 import { runOnce, aiScoreOne, scanRunning, appUrl, telegramQueue } from './run.js';
 import { getTelegramSettings, saveTelegramSettings, inQuietHours, localTime } from './settings.js';
 import { telegramConfigured, sendTelegram, formatJob, explainTelegramError, webhookSecret, setupWebhook, handleUpdate } from './telegram.js';
-import { aiConfigured, applyKit, summarizeJobs } from './ai.js';
+import { aiConfigured, applyKit } from './ai.js';
 import { handleAccountRoutes } from './routes-account.js';
+import { handleFeedRoutes } from './routes-feed.js';
+import { highlightsFor } from './highlights.js';
 import { serveApp } from './static.js';
 
 loadEnv();
@@ -74,38 +76,6 @@ p{color:#c00;margin:10px 0 0}@media(prefers-color-scheme:dark){body{background:#
 <input type="password" name="password" placeholder="Mật khẩu" autofocus required>
 <button>Đăng nhập</button>${error ? `<p>${error}</p>` : ''}</form></body></html>`;
 
-// ---- AI highlights: one Gemini call per job at most, even if the page asks twice while it runs ----
-const inflight = new Map(); // id -> Promise<points[] | null>
-
-async function highlightsFor(ids) {
-  const result = {};
-  const missing = [];
-  for (const id of ids) {
-    const job = await getJob(id);
-    if (!job) continue;
-    if (job.ai_highlights) result[id] = job.ai_highlights;
-    else if (!inflight.has(id)) missing.push(job);
-  }
-  if (missing.length) {
-    const call = summarizeJobs(missing).then(async (rows) => {
-      const byId = new Map(rows.map((r) => [r.id, r.points]));
-      for (const job of missing) if (byId.get(job.id)?.length) await saveHighlights(job.id, byId.get(job.id));
-      return byId;
-    });
-    for (const job of missing) {
-      inflight.set(job.id, call.then((byId) => byId.get(job.id) ?? null).finally(() => inflight.delete(job.id)));
-    }
-  }
-  const waiting = ids.filter((id) => !(id in result) && inflight.has(id));
-  const settled = await Promise.allSettled(waiting.map((id) => inflight.get(id)));
-  let error = null;
-  settled.forEach((s, i) => {
-    if (s.status === 'fulfilled' && s.value) result[waiting[i]] = s.value;
-    else if (s.status === 'rejected') error = s.reason.message;
-  });
-  return { highlights: result, error };
-}
-
 // Apply kits: the same, so two clicks never pay for two kits.
 const kitInflight = new Map(); // id -> Promise<kit>
 
@@ -166,6 +136,7 @@ const server = createServer(async (req, res) => {
 
     // Accounts (new apps) and the built apps themselves: they have their own login.
     if (await handleAccountRoutes(req, res, url, { appUrl: appUrl(config), isLocal: !PUBLIC })) return;
+    if (await handleFeedRoutes(req, res, url, { config })) return;
     if (await serveApp(req, res, url)) return;
 
     if (url.pathname === '/login') {

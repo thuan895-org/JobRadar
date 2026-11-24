@@ -80,6 +80,43 @@ export async function initDb() {
     );
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
     -- One-time links sent by email (verify the address, reset the password).
+    -- Where a job was written in Vietnamese (Freelancer.com tells us).
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS language TEXT;
+
+    -- What each user told us about themselves: skills (catalogue ids or their
+    -- own keyword groups), quiz answers, the text the AI reads, and their CV.
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      skills JSONB NOT NULL DEFAULT '[]',
+      exclude_terms JSONB NOT NULL DEFAULT '[]',
+      answers JSONB NOT NULL DEFAULT '{}',
+      summary TEXT NOT NULL DEFAULT '',
+      region_only BOOLEAN NOT NULL DEFAULT TRUE,
+      min_budget_usd INTEGER NOT NULL DEFAULT 30,
+      cv_name TEXT,
+      cv_mime TEXT,
+      cv_data BYTEA,
+      cv_text TEXT,
+      cv_uploaded_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+    -- A user's own state for a job: only created once they act on it or the AI reads it for them.
+    CREATE TABLE IF NOT EXISTS user_jobs (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'new',
+      ai_score INTEGER,
+      ai_reason TEXT,
+      ai_flags JSONB NOT NULL DEFAULT '[]',
+      ai_scam TEXT,
+      ai_checked_at TEXT,
+      apply_kit JSONB,
+      notified BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, job_id)
+    );
+    CREATE INDEX IF NOT EXISTS user_jobs_status ON user_jobs(user_id, status);
+
     CREATE TABLE IF NOT EXISTS user_tokens (
       token_hash TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -130,20 +167,20 @@ export async function upsertJob(job, now) {
   const { rows } = await q(`
     INSERT INTO jobs (id, source, title, company, url, description, tags, kind, location,
       budget_text, budget_min_usd, budget_max_usd, posted_at, bid_count, score, matched,
-      region_ok, first_seen, last_seen)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $18)
+      region_ok, first_seen, last_seen, language)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $18, $19)
     ON CONFLICT (id) DO UPDATE SET
       title = excluded.title, description = excluded.description, tags = excluded.tags,
       budget_text = excluded.budget_text, budget_min_usd = excluded.budget_min_usd,
       budget_max_usd = excluded.budget_max_usd, bid_count = excluded.bid_count,
       score = excluded.score, matched = excluded.matched, region_ok = excluded.region_ok,
-      last_seen = excluded.last_seen
+      last_seen = excluded.last_seen, language = excluded.language
     RETURNING (first_seen = $18) AS is_new
   `, [
     job.id, job.source, job.title, job.company ?? '', job.url, job.description ?? '',
     json(job.tags ?? []), job.kind ?? '', job.location ?? '', job.budgetText ?? '',
     job.budgetMinUsd ?? null, job.budgetMaxUsd ?? null, job.postedAt ?? null, job.bidCount ?? null,
-    job.score, json(job.matched), Boolean(job.regionOk), now,
+    job.score, json(job.matched), Boolean(job.regionOk), now, job.language || null,
   ]);
   return Boolean(rows[0]?.is_new);
 }
@@ -229,6 +266,10 @@ export async function silenceAll() {
  */
 export async function deleteStaleJobs(days) {
   const cutoff = new Date(Date.now() - days * 864e5).toISOString();
-  const { rowCount } = await q(`DELETE FROM jobs WHERE status IN ('new', 'hidden') AND last_seen < $1`, [cutoff]);
+  // A job any user saved or applied to stays, with that user's notes and AI results.
+  const { rowCount } = await q(`
+    DELETE FROM jobs WHERE status IN ('new', 'hidden') AND last_seen < $1
+      AND NOT EXISTS (SELECT 1 FROM user_jobs uj WHERE uj.job_id = jobs.id AND uj.status IN ('saved', 'applied'))
+  `, [cutoff]);
   return rowCount;
 }

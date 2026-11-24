@@ -31,6 +31,10 @@ Các lệnh `npm ...` trong README đều chạy ở **thư mục gốc** của 
 
 Trang cũ ở `/` vẫn dùng `APP_PASSWORD` như trước cho tới khi ứng dụng mới có đủ tính năng.
 
+Mỗi tài khoản có **hồ sơ riêng** (kỹ năng chọn từ danh mục hoặc từ khoá tự đặt, từ khoá muốn loại trừ, ngân sách tối thiểu, đoạn giới thiệu cho AI) và **trạng thái job riêng** (lưu, ẩn, đã nộp, điểm AI, bộ apply). Điểm từ khoá được tính theo hồ sơ mỗi khi mở danh sách job, nên mọi người dùng chung một kho job mà vẫn thấy thứ tự riêng. Tóm tắt "10 điểm chính" là theo job nên dùng chung cho mọi người.
+
+Lần đầu một admin mở ứng dụng mới, dữ liệu của bản một người dùng được chuyển sang tài khoản đó: trạng thái job, điểm AI và bộ apply đã có, kỹ năng trong `server/config.json` và nội dung `profile.md`.
+
 Server phục vụ bản đã build của hai ứng dụng, nên chạy `npm run build` một lần (và sau mỗi lần sửa giao diện). Khi đang sửa giao diện, chạy thêm các lệnh sau trong terminal khác để trang tự cập nhật (server vẫn chạy bằng `npm start`):
 
 ```bash
@@ -170,6 +174,10 @@ server/                    API, quét job, AI, Telegram (Node.js, Postgres)
   src/routes-account.js    API đăng ký, đăng nhập, Google, đồng ý điều khoản, dữ liệu của tôi, admin
   src/email.js             gửi email tài khoản qua Resend
   src/static.js            phục vụ bản build của client (/app/) và admin (/admin/)
+  src/profiles.js          hồ sơ từng người: danh mục kỹ năng, chấm điểm theo hồ sơ, chuyển dữ liệu cũ
+  src/routes-feed.js       API danh sách job cá nhân, lưu/ẩn/đã nộp, điểm AI và bộ apply theo người
+  src/highlights.js        tóm tắt 10 điểm chính, dùng chung mọi người
+  src/http.js              tiện ích HTTP dùng chung (cookie, JSON, giới hạn tần suất)
   public/index.html        giao diện hiện tại (sẽ được thay bằng frontend/client)
   config.json              nguồn, kỹ năng, ngưỡng điểm, AI, Telegram
 frontend/

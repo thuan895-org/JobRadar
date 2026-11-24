@@ -17,7 +17,7 @@ const perEmail = limiter(10, 15 * 60000); // wrong passwords for one account
 
 const googleEnabled = () => Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
-class HttpError extends Error {
+export class HttpError extends Error {
   constructor(status, message) {
     super(message);
     this.status = status;
@@ -29,7 +29,7 @@ export async function currentUser(req) {
   return userForSession(getCookie(req, SESSION_COOKIE));
 }
 
-async function requireUser(req, { consent = true } = {}) {
+export async function requireUser(req, { consent = true } = {}) {
   const user = await currentUser(req);
   if (!user) throw new HttpError(401, 'Bạn cần đăng nhập.');
   if (consent && publicUser(user).needsConsent) throw new HttpError(403, 'consent_required');

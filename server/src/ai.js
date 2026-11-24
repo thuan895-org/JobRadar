@@ -18,13 +18,19 @@ export function aiConfigured() {
 // profile.md: it is then readable at /etc/secrets/profile.md.
 const PROFILE_PATHS = () => [process.env.PROFILE_PATH, join(ROOT, 'profile.md'), '/etc/secrets/profile.md'].filter(Boolean);
 
+/**
+ * A field still in [brackets] is a template example, not a fact about the
+ * user. Hide it so the model cannot present it as real. Markdown links
+ * "[text](url)" are left alone.
+ */
+export function prepareProfile(text) {
+  return String(text ?? '').trim().replace(/\[[^\]\n]*\](?!\()/g, '[NOT FILLED IN]') || '(the user has not written a profile yet)';
+}
+
+/** The owner's profile.md, used by the original single-user page. */
 export function readProfile() {
   const file = PROFILE_PATHS().find((p) => existsSync(p));
-  if (!file) return '(no profile.md yet)';
-  // A field still in [brackets] is the template's example, not a fact about
-  // the user. Hide the example so the model cannot present it as real.
-  // Markdown links "[text](url)" are left alone.
-  return readFileSync(file, 'utf8').replace(/\[[^\]\n]*\](?!\()/g, '[NOT FILLED IN]');
+  return file ? prepareProfile(readFileSync(file, 'utf8')) : '(no profile.md yet)';
 }
 
 /**
@@ -115,8 +121,8 @@ reason_vi: one or two short sentences in Vietnamese saying why. red_flags_vi: sh
 Return one item per job, with the exact ID given.`;
 
 /** Scores up to ~10 jobs in one request. Returns [{ id, fit, reason_vi, red_flags_vi, scam_risk }]. */
-export async function scoreJobs(jobs) {
-  const prompt = `PROFILE:\n${readProfile()}\n\nJOBS:\n\n${jobs.map((j) => jobBrief(j, 1800)).join('\n\n---\n\n')}`;
+export async function scoreJobs(jobs, profile = readProfile()) {
+  const prompt = `PROFILE:\n${profile}\n\nJOBS:\n\n${jobs.map((j) => jobBrief(j, 1800)).join('\n\n---\n\n')}`;
   const { data } = await generateJson({ system: SCORE_SYSTEM, prompt, schema: SCORE_SCHEMA, temperature: 0.2, ...fast() });
   const ids = new Set(jobs.map((j) => j.id));
   return (Array.isArray(data) ? data : [])
@@ -206,8 +212,8 @@ missing_info_vi: everything the freelancer must fill in or verify before sending
 tips_vi: 2-4 short, practical tips for winning this specific job (and any red flags to check).`;
 
 /** Writes the application kit for one job. */
-export async function applyKit(job) {
-  const prompt = `PROFILE:\n${readProfile()}\n\nJOB:\n${jobBrief(job, 8000)}\nURL: ${job.url}`;
+export async function applyKit(job, profile = readProfile()) {
+  const prompt = `PROFILE:\n${profile}\n\nJOB:\n${jobBrief(job, 8000)}\nURL: ${job.url}`;
   const { data, model } = await generateJson({ system: KIT_SYSTEM, prompt, schema: KIT_SCHEMA, temperature: 0.6, ...best() });
   return { ...data, model, created_at: new Date().toISOString() };
 }
